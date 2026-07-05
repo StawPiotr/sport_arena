@@ -1,0 +1,125 @@
+<div class="app-shell">
+  <header class="topbar">
+    <a class="brand" routerLink="/" aria-label="Arena — strona główna">
+      <span class="brand-mark">A</span><span>ARENA</span>
+    </a>
+    <nav [class.open]="menuOpen()" aria-label="Główna nawigacja">
+      @for (category of categories; track category) {
+        <button type="button" [class.active]="selectedCategory() === category" (click)="selectCategory(category)">
+          {{ category }}
+        </button>
+      }
+    </nav>
+    <div class="header-actions">
+      @if (auth.username(); as username) {
+        <span class="user-chip"><span></span>{{ username }}</span>
+      }
+      <button class="icon-button" type="button" aria-label="Szukaj" (click)="toggleSearch()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16.2 16.2 4.3 4.3"></path></svg>
+      </button>
+      <button class="menu-button" type="button" aria-label="Otwórz menu" (click)="menuOpen.set(!menuOpen())">
+        <span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  @if (searchOpen()) {
+    <div class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16.2 16.2 4.3 4.3"></path></svg>
+      <input type="search" placeholder="Szukaj wiadomości, drużyn i zawodników..." [value]="searchPhrase()" (input)="setSearch($event)" />
+      <button type="button" (click)="toggleSearch()">Zamknij</button>
+    </div>
+  }
+
+  @if (!routedPage()) {
+  <main>
+    @if (loading()) {
+      <div class="state-card"><span class="loader"></span><p>Łapiemy najświeższe wyniki…</p></div>
+    } @else if (error()) {
+      <div class="state-card error"><strong>Nie udało się połączyć z API.</strong><p>Uruchom backend na porcie 8000 i odśwież stronę.</p></div>
+    } @else {
+      <section class="score-strip" aria-label="Wyniki meczów">
+        <div class="section-label"><span class="pulse"></span>Na żywo</div>
+        <div class="matches">
+          @for (match of matches(); track match.id) {
+            <article class="match-card">
+              <div class="match-meta"><span>{{ match.discipline }}</span><span [class.live]="match.status === 'LIVE'">{{ match.time }}</span></div>
+              <div class="team-row"><span class="team-badge">{{ match.home.short_name.slice(0, 1) }}</span><strong>{{ match.home.name }}</strong><b>{{ match.home.score ?? '–' }}</b></div>
+              <div class="team-row"><span class="team-badge alt">{{ match.away.short_name.slice(0, 1) }}</span><strong>{{ match.away.name }}</strong><b>{{ match.away.score ?? '–' }}</b></div>
+            </article>
+          }
+        </div>
+      </section>
+
+      @if (featuredArticle(); as featured) {
+        <section class="hero">
+          <article class="hero-story" [style.--accent]="featured.accent">
+            <div class="hero-copy">
+              <span class="eyebrow">{{ featured.category }} · Najważniejsze</span>
+              <h1>{{ featured.title }}</h1>
+              <p>{{ featured.excerpt }}</p>
+              <div class="story-meta"><span>{{ featured.published_at }}</span><span>{{ featured.reading_time }} min czytania</span></div>
+              <button type="button" class="primary-button" [routerLink]="['/artykul', featured.id]">Czytaj artykuł <span>↗</span></button>
+            </div>
+            <div class="hero-visual" aria-hidden="true">
+              <div class="stadium-lines"></div>
+              <div class="score-orbit"><span>POL</span><strong>2:1</strong><span>NED</span></div>
+              <span class="visual-caption">W centrum wydarzeń</span>
+            </div>
+          </article>
+        </section>
+      }
+
+      <section class="content-grid" id="news">
+        <div class="news-column">
+          <div class="section-heading">
+            <div><span class="eyebrow">Nie przegap</span><h2>Najnowsze wiadomości</h2></div>
+            <span class="result-count">{{ filteredArticles().length }} materiałów</span>
+          </div>
+          <div class="article-grid">
+            @for (article of filteredArticles(); track article.id) {
+              <a class="article-card" [style.--accent]="article.accent" [routerLink]="['/artykul', article.id]">
+                <div class="article-art"><span>{{ article.category }}</span><div class="art-number">0{{ article.id }}</div></div>
+                <div class="article-body">
+                  <span class="category">{{ article.category }}</span>
+                  <h3>{{ article.title }}</h3>
+                  <p>{{ article.excerpt }}</p>
+                  <div class="story-meta"><span>{{ article.published_at }}</span><span>{{ article.reading_time }} min</span></div>
+                </div>
+              </a>
+            } @empty {
+              <div class="empty-state"><strong>Brak takich materiałów</strong><span>Spróbuj zmienić kategorię lub wyszukiwaną frazę.</span></div>
+            }
+          </div>
+        </div>
+
+        <aside>
+          <div class="table-card">
+            <div class="aside-heading">
+              <div><span class="eyebrow">Ekstraklasa</span><h2>Tabela</h2></div>
+              <button type="button" aria-label="Więcej">↗</button>
+            </div>
+            <div class="table-head"><span>#</span><span>Drużyna</span><span>M</span><span>PKT</span></div>
+            @for (row of standings(); track row.position) {
+              <div class="table-row"><span>{{ row.position }}</span><strong>{{ row.team }}</strong><span>{{ row.played }}</span><b>{{ row.points }}</b></div>
+            }
+          </div>
+          <div class="newsletter">
+            <span class="eyebrow">Arena Brief</span>
+            <h3>Sport w jednej wiadomości.</h3>
+            <p>Najważniejsze wyniki i historie. Bez szumu, raz dziennie.</p>
+            <label><span class="sr-only">Adres e-mail</span><input type="email" placeholder="Twój e-mail" /><button type="button" aria-label="Zapisz się">→</button></label>
+          </div>
+        </aside>
+      </section>
+    }
+  </main>
+  } @else {
+    <router-outlet />
+  }
+
+  <footer>
+    <a class="brand" routerLink="/"><span class="brand-mark">A</span><span>ARENA</span></a>
+    <p>Sport zaczyna się tutaj.</p><span>© 2026 Arena</span>
+  </footer>
+</div>

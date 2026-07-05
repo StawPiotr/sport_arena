@@ -1,0 +1,76 @@
+<main class="employee-page">
+  <div class="employee-backdrop" aria-hidden="true">
+    <span>ARENA</span><span>STAFF</span>
+  </div>
+
+  @if (auth.checkingSession()) {
+    <section class="login-card status-card">
+      <span class="loader"></span>
+      <p>Sprawdzamy sesję…</p>
+    </section>
+  } @else if (auth.username(); as username) {
+    <section class="login-card signed-in">
+      <span class="access-label">Strefa pracownika</span>
+      <div class="success-icon">✓</div>
+      <h1>Witaj, {{ username }}</h1>
+      <p>Logowanie przebiegło pomyślnie. Panel redakcyjny dodamy w kolejnym etapie.</p>
+      <div class="signed-actions">
+        <a routerLink="/">Przejdź do portalu</a>
+        <button type="button" (click)="auth.logout()">Wyloguj się</button>
+      </div>
+    </section>
+  } @else {
+    <section class="login-card">
+      <div class="card-top">
+        <span class="access-label">Dostęp wewnętrzny</span>
+        <span class="lock">●</span>
+      </div>
+      <h1>Panel pracownika</h1>
+      <p class="intro">Zaloguj się, aby przejść do narzędzi redakcyjnych portalu Arena.</p>
+
+      <form (ngSubmit)="submit()">
+        <label>
+          <span>Login</span>
+          <input
+            type="text"
+            name="login"
+            autocomplete="username"
+            placeholder="Wpisz login"
+            [ngModel]="login()"
+            (ngModelChange)="login.set($event)"
+          />
+        </label>
+        <label>
+          <span>Hasło</span>
+          <div class="password-field">
+            <input
+              [type]="passwordVisible() ? 'text' : 'password'"
+              name="password"
+              autocomplete="current-password"
+              placeholder="Wpisz hasło"
+              [ngModel]="password()"
+              (ngModelChange)="password.set($event)"
+            />
+            <button type="button" (click)="passwordVisible.set(!passwordVisible())">
+              {{ passwordVisible() ? 'Ukryj' : 'Pokaż' }}
+            </button>
+          </div>
+        </label>
+
+        @if (errorMessage()) {
+          <p class="form-error" role="alert">{{ errorMessage() }}</p>
+        }
+
+        <button class="submit-button" type="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Logowanie…' : 'Zaloguj się' }}
+          <span>→</span>
+        </button>
+      </form>
+
+      <div class="security-note">
+        <span>i</span>
+        <p>To jest chroniona część serwisu przeznaczona wyłącznie dla pracowników.</p>
+      </div>
+    </section>
+  }
+</main>

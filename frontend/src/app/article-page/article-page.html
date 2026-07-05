@@ -1,0 +1,55 @@
+<main class="article-page">
+  @if (loading()) {
+    <div class="article-state"><span class="loader"></span><p>Otwieramy artykuł…</p></div>
+  } @else if (notFound()) {
+    <div class="article-state">
+      <span class="error-code">404</span>
+      <h1>Ten artykuł nie istnieje</h1>
+      <p>Materiał mógł zostać przeniesiony lub usunięty.</p>
+      <a routerLink="/">Wróć na stronę główną →</a>
+    </div>
+  } @else if (article(); as item) {
+    <article [style.--accent]="item.accent">
+      <a class="back-link" routerLink="/">← Wszystkie wiadomości</a>
+
+      <header class="article-header">
+        <span class="category">{{ item.category }}</span>
+        <h1>{{ item.title }}</h1>
+        <p class="lead">{{ item.excerpt }}</p>
+        <div class="byline">
+          <div class="author-avatar">{{ item.author.slice(0, 1) }}</div>
+          <div><strong>{{ item.author }}</strong><span>{{ item.published_at }} · {{ item.reading_time }} min czytania</span></div>
+        </div>
+      </header>
+
+      @if (item.image_url) {
+        <figure>
+          <img [src]="item.image_url" [alt]="item.image_alt ?? item.title" />
+          <figcaption>Zdjęcie ilustracyjne · Pexels</figcaption>
+        </figure>
+      }
+
+      <div class="article-layout">
+        <aside class="share">
+          <span>Udostępnij</span>
+          <button type="button" aria-label="Udostępnij na Facebooku">f</button>
+          <button type="button" aria-label="Udostępnij na X">𝕏</button>
+          <button type="button" aria-label="Skopiuj link">↗</button>
+        </aside>
+        <div class="article-content">
+          @for (paragraph of item.content; track $index) {
+            <p>{{ paragraph }}</p>
+            @if ($index === 1 && item.quote) {
+              <blockquote>{{ item.quote }}</blockquote>
+            }
+          }
+          @if (!item.content.length) {
+            <p>{{ item.excerpt }}</p>
+            <p>Pełna treść tego materiału pojawi się wkrótce.</p>
+          }
+          <div class="article-end"><span></span>ARENA</div>
+        </div>
+      </div>
+    </article>
+  }
+</main>

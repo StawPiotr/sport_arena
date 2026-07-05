@@ -1,0 +1,173 @@
+.employee-page {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: calc(100vh - 76px);
+  overflow: hidden;
+  padding: 60px 24px 90px;
+  position: relative;
+}
+
+.employee-backdrop {
+  color: rgb(255 255 255 / 2.5%);
+  display: flex;
+  flex-direction: column;
+  font-size: clamp(130px, 22vw, 340px);
+  font-weight: 900;
+  inset: -8% 0 0;
+  justify-content: center;
+  letter-spacing: -20px;
+  line-height: .67;
+  pointer-events: none;
+  position: absolute;
+  text-align: center;
+  transform: rotate(-5deg);
+  user-select: none;
+}
+
+.login-card {
+  background: rgb(20 23 24 / 94%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 35px 100px rgb(0 0 0 / 35%);
+  max-width: 470px;
+  padding: 42px;
+  position: relative;
+  width: 100%;
+  z-index: 1;
+}
+
+.card-top { align-items: center; display: flex; justify-content: space-between; }
+.access-label {
+  color: var(--signal);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.7px;
+  text-transform: uppercase;
+}
+.lock { color: var(--signal); font-size: 9px; text-shadow: 0 0 12px var(--signal); }
+h1 { font-size: 39px; letter-spacing: -2px; margin: 22px 0 11px; }
+.intro, .signed-in > p { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0 0 31px; }
+form { display: flex; flex-direction: column; gap: 19px; }
+label > span {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+input {
+  background: #0f1112;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  padding: 14px 15px;
+  transition: border-color .2s;
+  width: 100%;
+}
+input:focus { border-color: var(--signal); }
+.password-field { position: relative; }
+.password-field input { padding-right: 65px; }
+.password-field button {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.form-error { color: #ff766c; font-size: 11px; margin: -4px 0 0; }
+.submit-button {
+  align-items: center;
+  background: var(--signal);
+  border: 0;
+  border-radius: 5px;
+  color: #11130d;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 15px 17px;
+  text-transform: uppercase;
+}
+.submit-button:disabled { cursor: wait; opacity: .65; }
+.submit-button span { font-size: 18px; }
+.security-note {
+  align-items: flex-start;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  display: flex;
+  gap: 10px;
+  margin-top: 30px;
+  padding-top: 20px;
+}
+.security-note > span {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  display: flex;
+  flex: 0 0 18px;
+  font-size: 9px;
+  height: 18px;
+  justify-content: center;
+}
+.security-note p { font-size: 9px; line-height: 1.55; margin: 1px 0 0; }
+.status-card { align-items: center; display: flex; flex-direction: column; min-height: 250px; justify-content: center; }
+.status-card p { color: var(--muted); font-size: 12px; }
+.loader {
+  animation: spin .8s linear infinite;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  border-top-color: var(--signal);
+  height: 32px;
+  width: 32px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.signed-in { text-align: center; }
+.success-icon {
+  align-items: center;
+  background: var(--signal);
+  border-radius: 50%;
+  color: #11130d;
+  display: flex;
+  font-size: 25px;
+  font-weight: 900;
+  height: 64px;
+  justify-content: center;
+  margin: 30px auto 0;
+  width: 64px;
+}
+.signed-actions { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+.signed-actions a, .signed-actions button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 13px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.signed-actions a { background: var(--signal); border-color: var(--signal); color: #11130d; }
+
+@media (max-width: 560px) {
+  .employee-page { align-items: flex-start; padding: 32px 16px 60px; }
+  .login-card { padding: 30px 23px; }
+  h1 { font-size: 33px; }
+  .employee-backdrop { display: none; }
+}
