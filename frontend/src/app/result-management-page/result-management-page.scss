@@ -1,0 +1,82 @@
+.results-page {
+  margin: 0 auto;
+  max-width: 1180px;
+  min-height: 70vh;
+  padding: 46px 24px 100px;
+}
+.page-head {
+  align-items: flex-end; display: flex; gap: 24px; justify-content: space-between; margin-bottom: 24px;
+}
+.back-link, .state-card a { color: var(--signal); font-size: 12px; font-weight: 800; text-decoration: none; }
+.eyebrow {
+  color: var(--signal); display: block; font-size: 9px; font-weight: 900;
+  letter-spacing: 1.7px; margin: 28px 0 15px; text-transform: uppercase;
+}
+.settings-card .eyebrow { margin-top: 0; }
+h1 { font-size: clamp(42px, 6vw, 72px); letter-spacing: -3.4px; line-height: .98; margin: 0 0 16px; }
+.page-head p, .state-card p { color: var(--muted); line-height: 1.65; margin: 0; max-width: 650px; }
+.primary-link {
+  background: var(--signal); border-radius: 5px; color: #11130d; flex: 0 0 auto;
+  font-size: 11px; font-weight: 900; padding: 14px 17px; text-decoration: none; text-transform: uppercase;
+}
+.summary-strip, .settings-card, .table-card, .state-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+}
+.summary-strip {
+  color: var(--muted); display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; padding: 14px;
+}
+.summary-strip span {
+  border-right: 1px solid var(--line); font-size: 11px; font-weight: 800; padding-right: 12px;
+}
+.summary-strip span:last-child { border-right: 0; }
+.settings-card { margin-bottom: 18px; padding: 22px; }
+.settings-grid { display: grid; gap: 12px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+label span {
+  display: block; font-size: 9px; font-weight: 900; letter-spacing: 1px; margin-bottom: 8px; text-transform: uppercase;
+}
+input {
+  background: #0f1112; border: 1px solid var(--line); border-radius: 6px; color: var(--ink);
+  font: inherit; font-size: 13px; padding: 12px; width: 100%;
+}
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; min-width: 920px; width: 100%; }
+th {
+  color: var(--muted); font-size: 9px; letter-spacing: 1px; padding: 15px 16px; text-align: left; text-transform: uppercase;
+}
+td { border-top: 1px solid var(--line); font-size: 12px; padding: 16px; vertical-align: top; }
+td strong, td span { display: block; }
+td strong { font-size: 13px; line-height: 1.35; }
+td > span { color: var(--muted); margin-top: 7px; }
+.hidden-row { opacity: .55; }
+.pill {
+  background: rgb(80 227 164 / 12%); border: 1px solid rgb(80 227 164 / 28%);
+  border-radius: 999px; color: #50e3a4; display: inline-flex; font-size: 9px; font-weight: 900;
+  padding: 6px 9px; text-transform: uppercase;
+}
+.pill.live { background: rgb(255 85 74 / 12%); border-color: rgb(255 85 74 / 28%); color: #ff6259; }
+.pill.off { background: rgb(255 118 108 / 10%); border-color: rgb(255 118 108 / 24%); color: #ff766c; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.status-toggle, .row-actions a, .row-actions button {
+  background: transparent; border: 1px solid var(--line); border-radius: 5px; color: var(--ink);
+  cursor: pointer; font: inherit; font-size: 9px; font-weight: 900; padding: 9px 10px; text-transform: uppercase;
+}
+.row-actions a { text-decoration: none; }
+.status-toggle:hover, .row-actions a:hover, .row-actions button:hover { border-color: var(--signal); color: var(--signal); }
+.status-toggle.live { border-color: rgb(255 85 74 / 28%); color: #ff6259; }
+.row-actions .danger { color: #ff766c; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+.form-error { color: #ff766c; font-size: 12px; margin: 0 0 14px; }
+.empty-cell { color: var(--muted); padding: 45px; text-align: center; }
+.state-card {
+  align-items: center; display: flex; flex-direction: column; justify-content: center; min-height: 50vh; padding: 30px; text-align: center;
+}
+.loader {
+  animation: spin .8s linear infinite; border: 2px solid var(--line); border-radius: 50%;
+  border-top-color: var(--signal); height: 34px; width: 34px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 760px) {
+  .results-page { padding: 30px 16px 70px; }
+  .page-head { align-items: flex-start; flex-direction: column; }
+  .settings-grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,155 @@
+<main class="editor-page">
+  @if (auth.checkingSession() || loadingArticle()) {
+    <section class="state-card"><span class="loader"></span><p>Sprawdzamy sesję…</p></section>
+  } @else if (!auth.username()) {
+    <section class="state-card">
+      <span class="access-label">Strefa redakcji</span>
+      <h1>Najpierw logowanie</h1>
+      <p>Tworzenie artykułów jest dostępne tylko dla zalogowanego pracownika.</p>
+      <a routerLink="/employee">Przejdź do logowania →</a>
+    </section>
+  } @else {
+    <form class="editor-shell" (ngSubmit)="submit()">
+      <header>
+        <a routerLink="/" class="back-link">← Wróć do portalu</a>
+        <span class="access-label">{{ editing() ? 'Edycja materiału' : 'Nowy materiał' }}</span>
+        <h1>{{ editing() ? 'Edytuj artykuł' : 'Dodaj nowy artykuł' }}</h1>
+        <p>Ułóż treść z bloków tekstowych i zdjęciowych. Kolejność możesz zmieniać przyciskami góra/dół.</p>
+      </header>
+
+      <section class="panel">
+        <div class="field-grid">
+          <label>
+            <span>Sport</span>
+            <select
+              name="sport"
+              [disabled]="loadingSports()"
+              [ngModel]="selectedSport()"
+              (ngModelChange)="selectedSport.set($event)"
+            >
+              @for (sport of sports(); track sport.name) {
+                <option [value]="sport.name">{{ sport.name }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="schedule-toggle">
+            <input
+              type="checkbox"
+              name="publishLater"
+              [ngModel]="publishLater()"
+              (ngModelChange)="publishLater.set($event)"
+            />
+            <span>Publikacja w innym terminie</span>
+          </label>
+
+          @if (publishLater()) {
+            <label>
+              <span>Dzień i godzina publikacji</span>
+              <input
+                type="datetime-local"
+                name="publishedAt"
+                [ngModel]="publishedAt()"
+                (ngModelChange)="publishedAt.set($event)"
+              />
+            </label>
+          }
+        </div>
+
+        <label>
+          <span>Tytuł</span>
+          <input
+            type="text"
+            name="title"
+            placeholder="Np. Wielki finał coraz bliżej"
+            [ngModel]="title()"
+            (ngModelChange)="title.set($event)"
+          />
+        </label>
+
+        <label>
+          <span>Skrót artykułu</span>
+          <textarea
+            name="excerpt"
+            rows="3"
+            placeholder="Krótki opis widoczny na miniaturce i w nagłówku artykułu"
+            [ngModel]="excerpt()"
+            (ngModelChange)="excerpt.set($event)"
+          ></textarea>
+        </label>
+      </section>
+
+      <section class="blocks-panel">
+        <div class="blocks-heading">
+          <div>
+            <span class="access-label">Treść blokowa</span>
+            <h2>Bloki artykułu</h2>
+          </div>
+          <div class="block-actions">
+            <button type="button" (click)="addTextBlock()">+ Tekst</button>
+            <button type="button" (click)="addImageBlock()">+ Zdjęcie</button>
+          </div>
+        </div>
+
+        <div class="blocks-list">
+          @for (block of blocks(); track $index) {
+            <article class="content-block">
+              <div class="block-toolbar">
+                <strong>{{ block.type === 'text' ? 'Blok tekstowy' : 'Blok zdjęcia' }}</strong>
+                <div>
+                  <button type="button" [disabled]="$first" (click)="moveBlock($index, -1)">↑</button>
+                  <button type="button" [disabled]="$last" (click)="moveBlock($index, 1)">↓</button>
+                  <button type="button" [disabled]="blocks().length === 1" (click)="removeBlock($index)">Usuń</button>
+                </div>
+              </div>
+
+              @if (block.type === 'text') {
+                <div class="mini-editor">
+                  <div class="editor-hint">Prosty edytor tekstu</div>
+                  <textarea
+                    rows="7"
+                    placeholder="Napisz akapit artykułu..."
+                    [name]="'blockText' + $index"
+                    [ngModel]="block.content"
+                    (ngModelChange)="updateBlock($index, { content: $event })"
+                  ></textarea>
+                </div>
+              } @else {
+                <div class="image-editor">
+                  @if (block.src) {
+                    <img [src]="block.src" [alt]="block.alt || 'Podgląd zdjęcia'" />
+                  } @else {
+                    <div class="image-placeholder">Dodaj zdjęcie</div>
+                  }
+                  <label class="file-picker">
+                    <span>Wybierz plik</span>
+                    <input type="file" accept="image/*" (change)="selectImage($index, $event)" />
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Opis alternatywny zdjęcia"
+                    [name]="'blockAlt' + $index"
+                    [ngModel]="block.alt"
+                    (ngModelChange)="updateBlock($index, { alt: $event })"
+                  />
+                </div>
+              }
+            </article>
+          }
+        </div>
+      </section>
+
+      @if (errorMessage()) {
+        <p class="form-error" role="alert">{{ errorMessage() }}</p>
+      }
+
+      <footer class="submit-bar">
+        <span>Autor: {{ auth.username() }}</span>
+        <button type="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Zapisywanie…' : (editing() ? 'Zapisz zmiany' : 'Zapisz artykuł') }}
+          <span>→</span>
+        </button>
+      </footer>
+    </form>
+  }
+</main>

@@ -25,22 +25,59 @@ nav button::after {
 }
 nav button:hover, nav button.active { color: var(--ink); }
 nav button.active::after { opacity: 1; transform: scaleX(1); }
-.header-actions { display: flex; justify-content: flex-end; }
+.header-actions { display: flex; justify-content: flex-end; position: relative; }
+.user-menu { position: relative; }
 .user-chip {
   align-items: center;
+  background: transparent;
+  border: 0;
   color: var(--ink);
+  cursor: pointer;
   display: flex;
   font-size: 11px;
   font-weight: 800;
   gap: 7px;
   margin-right: 12px;
+  min-height: 42px;
+  padding: 0;
 }
-.user-chip span {
+.user-chip > span {
   background: var(--signal);
   border-radius: 50%;
   box-shadow: 0 0 0 4px rgb(223 255 63 / 8%);
   height: 7px;
   width: 7px;
+}
+.user-dropdown {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 18px 45px rgb(0 0 0 / 35%);
+  display: grid;
+  gap: 4px;
+  min-width: 190px;
+  padding: 8px;
+  position: absolute;
+  right: 10px;
+  top: calc(100% + 8px);
+  z-index: 20;
+}
+.user-dropdown a, .user-dropdown button {
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 11px 12px;
+  text-align: left;
+  text-decoration: none;
+}
+.user-dropdown a:hover, .user-dropdown button:hover {
+  background: rgb(223 255 63 / 9%);
+  color: var(--signal);
 }
 .icon-button, .menu-button {
   align-items: center; background: transparent; border: 1px solid var(--line);
@@ -74,8 +111,14 @@ main { margin: 0 auto; max-width: 1380px; padding: 0 24px; }
   letter-spacing: 1.3px; text-transform: uppercase;
 }
 .pulse { background: #ff554a; border-radius: 50%; box-shadow: 0 0 0 5px rgb(255 85 74 / 10%); height: 7px; width: 7px; }
-.matches { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.matches {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
 .match-card { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 13px 16px; }
+.matches .match-card { flex: 0 0 calc((100% - 24px) / 3); min-width: 250px; }
 .match-meta, .story-meta {
   color: var(--muted); display: flex; font-size: 10px; justify-content: space-between;
   letter-spacing: .4px; margin-bottom: 10px; text-transform: uppercase;
@@ -157,10 +200,21 @@ h2 { font-size: 30px; letter-spacing: -1.4px; margin: 0; }
     linear-gradient(145deg, color-mix(in srgb, var(--accent) 40%, #16191a), #151819);
   height: 165px; overflow: hidden; padding: 18px; position: relative;
 }
-.article-art > span { color: rgb(255 255 255 / 80%); font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.article-art::after {
+  background: linear-gradient(180deg, rgb(0 0 0 / 8%), rgb(0 0 0 / 62%));
+  content: '';
+  inset: 0;
+  position: absolute;
+}
+.article-art img { height: 100%; inset: 0; object-fit: cover; position: absolute; transition: transform .4s ease; width: 100%; }
+.article-card:hover .article-art img { transform: scale(1.035); }
+.article-art > span {
+  color: white; font-size: 9px; font-weight: 800; letter-spacing: 1px;
+  position: relative; text-shadow: 0 1px 8px rgb(0 0 0 / 50%); text-transform: uppercase; z-index: 2;
+}
 .art-number {
   bottom: -25px; color: rgb(255 255 255 / 12%); font-size: 140px; font-weight: 900;
-  letter-spacing: -13px; position: absolute; right: -3px;
+  letter-spacing: -13px; position: absolute; right: -3px; z-index: 2;
 }
 .article-body { padding: 22px; }
 .article-body .category { color: var(--accent); margin-bottom: 12px; }
@@ -171,6 +225,7 @@ h2 { font-size: 30px; letter-spacing: -1.4px; margin: 0; }
   align-items: center; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted);
   display: flex; flex-direction: column; gap: 8px; grid-column: 1 / -1; padding: 60px;
 }
+.empty-state.compact { min-height: 126px; padding: 24px; }
 .empty-state strong { color: var(--ink); }
 aside { padding-top: 4px; }
 .table-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px; }

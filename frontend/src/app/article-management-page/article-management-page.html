@@ -1,0 +1,104 @@
+<main class="management-page">
+  @if (auth.checkingSession()) {
+    <section class="state-card"><span class="loader"></span><p>Sprawdzamy sesję…</p></section>
+  } @else if (!auth.username()) {
+    <section class="state-card">
+      <span class="eyebrow">Panel redakcyjny</span>
+      <h1>Najpierw logowanie</h1>
+      <p>Zarządzanie artykułami jest dostępne tylko dla zalogowanego pracownika.</p>
+      <a routerLink="/employee">Przejdź do logowania →</a>
+    </section>
+  } @else {
+    <section class="page-head">
+      <div>
+        <a class="back-link" routerLink="/">← Wróć do portalu</a>
+        <span class="eyebrow">Redakcja</span>
+        <h1>Zarządzaj artykułami</h1>
+        <p>Wybierz materiał główny, ukryj szkic z portalu albo usuń niepotrzebny wpis.</p>
+      </div>
+      <a class="primary-link" routerLink="/employee/article/new">Dodaj artykuł</a>
+    </section>
+
+    <section class="summary-strip">
+      <span>{{ articles().length }} artykułów łącznie</span>
+      <span>{{ visibleCount() }} widocznych</span>
+    </section>
+
+    @if (errorMessage()) {
+      <p class="form-error" role="alert">{{ errorMessage() }}</p>
+    }
+
+    @if (loading()) {
+      <section class="state-card"><span class="loader"></span><p>Ładujemy tabelę artykułów…</p></section>
+    } @else {
+      <section class="table-card">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Tytuł</th>
+                <th>Sport</th>
+                <th>Publikacja</th>
+                <th>Status</th>
+                <th>Główny</th>
+                <th>Akcje</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (article of articles(); track article.id) {
+                <tr [class.hidden-row]="article.hidden">
+                  <td>
+                    <strong>{{ article.title }}</strong>
+                    <span>{{ article.excerpt }}</span>
+                  </td>
+                  <td>{{ article.category }}</td>
+                  <td>{{ dateLabel(article.published_at) }}</td>
+                  <td>
+                    <span class="pill" [class.off]="article.hidden">
+                      {{ article.hidden ? 'Ukryty' : 'Widoczny' }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="featured-flags">
+                      @if (article.featured) {
+                        <span>Strona główna</span>
+                      }
+                      @if (article.category_featured) {
+                        <span>{{ article.category }}</span>
+                      }
+                      @if (!article.featured && !article.category_featured) {
+                        <em>Domyślnie wg daty</em>
+                      }
+                    </div>
+                  </td>
+                  <td>
+                    <div class="row-actions">
+                      <a [routerLink]="['/artykul', article.id]">Podgląd</a>
+                      <a [routerLink]="['/employee/article', article.id, 'edit']">Edytuj</a>
+                      <button type="button" [disabled]="busyId() === article.id" (click)="setFeatured(article, 'home')">
+                        Główna
+                      </button>
+                      <button type="button" [disabled]="busyId() === article.id" (click)="setFeatured(article, 'category')">
+                        Sport
+                      </button>
+                      <button type="button" [disabled]="busyId() === article.id" (click)="toggleHidden(article)">
+                        {{ article.hidden ? 'Pokaż' : 'Ukryj' }}
+                      </button>
+                      <button class="danger" type="button" [disabled]="busyId() === article.id" (click)="deleteArticle(article)">
+                        Usuń
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="empty-cell">Nie ma jeszcze artykułów.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+</main>

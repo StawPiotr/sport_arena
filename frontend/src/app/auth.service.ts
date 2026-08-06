@@ -5,6 +5,7 @@ import { catchError, finalize, Observable, of, tap } from 'rxjs';
 interface LoginResponse {
   token: string;
   username: string;
+  full_name: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -35,10 +36,15 @@ export class AuthService {
     this.clearSession();
     if (token) {
       this.http
-        .post<void>('/api/auth/logout', {}, { headers: this.authHeaders(token) })
+        .post<void>('/api/auth/logout', {}, { headers: this.buildAuthHeaders(token) })
         .pipe(catchError(() => of(undefined)))
         .subscribe();
     }
+  }
+
+  authHeaders(): HttpHeaders {
+    const token = this.token;
+    return token ? this.buildAuthHeaders(token) : new HttpHeaders();
   }
 
   private restoreSession(): void {
@@ -50,7 +56,7 @@ export class AuthService {
 
     this.http
       .get<{ username: string }>('/api/auth/me', {
-        headers: this.authHeaders(token),
+        headers: this.buildAuthHeaders(token),
       })
       .pipe(finalize(() => this.checkingSession.set(false)))
       .subscribe({
@@ -63,7 +69,7 @@ export class AuthService {
     return localStorage.getItem(this.storageKey);
   }
 
-  private authHeaders(token: string): HttpHeaders {
+  private buildAuthHeaders(token: string): HttpHeaders {
     return new HttpHeaders({ Authorization: `Bearer ${token}` });
   }
 

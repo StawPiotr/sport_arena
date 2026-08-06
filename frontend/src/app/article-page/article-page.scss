@@ -22,8 +22,19 @@
   border-top-color: var(--signal); height: 34px; width: 34px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.article-actions { align-items: center; display: flex; justify-content: space-between; }
 .back-link { color: var(--muted); font-size: 12px; font-weight: 700; text-decoration: none; }
 .back-link:hover { color: var(--ink); }
+.edit-link {
+  background: var(--signal);
+  border-radius: 5px;
+  color: #11130d;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 11px 14px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
 .article-header { margin: 80px auto 52px; max-width: 930px; text-align: center; }
 .category {
   color: var(--accent); display: block; font-size: 10px; font-weight: 900;
@@ -58,6 +69,21 @@ figcaption { color: var(--muted); font-size: 9px; letter-spacing: .5px; margin-t
 .article-content > p:first-child::first-letter {
   color: var(--accent); float: left; font-size: 72px; font-weight: 900; line-height: .72;
   margin: 12px 12px 0 0;
+}
+.inline-image { margin: 42px 0; }
+.inline-image img {
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+.inline-image figcaption {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: .5px;
+  margin-top: 10px;
+  text-transform: uppercase;
 }
 blockquote {
   border-left: 3px solid var(--accent); color: var(--ink); font-size: 27px; font-weight: 700;

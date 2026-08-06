@@ -1,4 +1,5 @@
 .venv/
+backend/arena.db
 __pycache__/
 .pytest_cache/
 *.pyc

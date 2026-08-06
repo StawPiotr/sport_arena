@@ -1,0 +1,77 @@
+<main class="result-editor-page">
+  @if (auth.checkingSession() || loadingResult()) {
+    <section class="state-card"><span class="loader"></span><p>Sprawdzamy sesję…</p></section>
+  } @else if (!auth.username()) {
+    <section class="state-card">
+      <span class="eyebrow">Panel wyników</span>
+      <h1>Najpierw logowanie</h1>
+      <p>Dodawanie wyników jest dostępne tylko dla zalogowanego pracownika.</p>
+      <a routerLink="/employee">Przejdź do logowania →</a>
+    </section>
+  } @else {
+    <form class="editor-card" (ngSubmit)="submit()">
+      <a class="back-link" routerLink="/employee/results">← Zarządzaj wynikami</a>
+      <span class="eyebrow">{{ editing() ? 'Edycja wyniku' : 'Nowy wynik' }}</span>
+      <h1>{{ editing() ? 'Edytuj wynik' : 'Dodaj wynik' }}</h1>
+
+      <label>
+        <span>Sport</span>
+        <select name="sport" [disabled]="loadingSports()" [ngModel]="selectedSport()" (ngModelChange)="selectedSport.set($event)">
+          @for (sport of sports(); track sport.name) {
+            <option [value]="sport.name">{{ sport.name }}</option>
+          }
+        </select>
+      </label>
+
+      <div class="teams-grid">
+        <label>
+          <span>Gospodarz / zawodnik 1</span>
+          <input name="homeName" type="text" [ngModel]="homeName()" (ngModelChange)="homeName.set($event)" />
+        </label>
+        <label>
+          <span>Skrót</span>
+          <input name="homeShortName" type="text" maxlength="4" [ngModel]="homeShortName()" (ngModelChange)="homeShortName.set($event)" />
+        </label>
+        <label>
+          <span>Wynik</span>
+          <input name="homeScore" type="number" [ngModel]="homeScore()" (ngModelChange)="homeScore.set($event === '' ? null : +$event)" />
+        </label>
+      </div>
+
+      <div class="teams-grid">
+        <label>
+          <span>Gość / zawodnik 2</span>
+          <input name="awayName" type="text" [ngModel]="awayName()" (ngModelChange)="awayName.set($event)" />
+        </label>
+        <label>
+          <span>Skrót</span>
+          <input name="awayShortName" type="text" maxlength="4" [ngModel]="awayShortName()" (ngModelChange)="awayShortName.set($event)" />
+        </label>
+        <label>
+          <span>Wynik</span>
+          <input name="awayScore" type="number" [ngModel]="awayScore()" (ngModelChange)="awayScore.set($event === '' ? null : +$event)" />
+        </label>
+      </div>
+
+      <div class="options-grid two-columns">
+        <label class="check-row">
+          <input name="isLive" type="checkbox" [ngModel]="isLive()" (ngModelChange)="isLive.set($event)" />
+          <span>Wynik na żywo</span>
+        </label>
+        <label class="check-row">
+          <input name="visible" type="checkbox" [ngModel]="visible()" (ngModelChange)="visible.set($event)" />
+          <span>Wyświetlaj na portalu</span>
+        </label>
+      </div>
+
+      @if (errorMessage()) {
+        <p class="form-error" role="alert">{{ errorMessage() }}</p>
+      }
+
+      <button class="submit-button" type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Zapisywanie…' : (editing() ? 'Zapisz zmiany' : 'Zapisz wynik') }}
+        <span>→</span>
+      </button>
+    </form>
+  }
+</main>

@@ -1,0 +1,59 @@
+.result-editor-page {
+  margin: 0 auto;
+  max-width: 920px;
+  min-height: 70vh;
+  padding: 46px 24px 100px;
+}
+.editor-card, .state-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 34px;
+}
+.back-link, .state-card a { color: var(--signal); font-size: 12px; font-weight: 800; text-decoration: none; }
+.eyebrow {
+  color: var(--signal); display: block; font-size: 9px; font-weight: 900;
+  letter-spacing: 1.7px; margin: 28px 0 15px; text-transform: uppercase;
+}
+h1 { font-size: clamp(40px, 6vw, 66px); letter-spacing: -3px; line-height: .98; margin: 0 0 28px; }
+label > span {
+  display: block; font-size: 9px; font-weight: 900; letter-spacing: 1px;
+  margin-bottom: 8px; text-transform: uppercase;
+}
+input, select {
+  background: #0f1112; border: 1px solid var(--line); border-radius: 6px; color: var(--ink);
+  font: inherit; font-size: 13px; outline: none; padding: 13px 14px; width: 100%;
+}
+input:focus, select:focus { border-color: var(--signal); }
+.teams-grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) 110px 100px; margin-top: 18px; }
+.options-grid { display: grid; gap: 12px; grid-template-columns: 170px 190px 1fr; margin-top: 18px; }
+.options-grid.two-columns { grid-template-columns: 170px 190px; }
+.check-row {
+  align-items: center; border: 1px solid var(--line); border-radius: 6px;
+  display: flex; gap: 10px; padding: 0 13px;
+}
+.check-row input { accent-color: var(--signal); width: auto; }
+.check-row span { margin: 0; }
+.form-error { color: #ff766c; font-size: 12px; }
+.submit-button {
+  align-items: center; background: var(--signal); border: 0; border-radius: 5px; color: #11130d;
+  cursor: pointer; display: flex; font: inherit; font-size: 11px; font-weight: 900;
+  gap: 26px; justify-content: space-between; margin-top: 24px; padding: 15px 17px; text-transform: uppercase;
+}
+.submit-button:disabled { cursor: wait; opacity: .65; }
+.state-card {
+  align-items: center; display: flex; flex-direction: column; justify-content: center;
+  min-height: 50vh; text-align: center;
+}
+.state-card p { color: var(--muted); }
+.loader {
+  animation: spin .8s linear infinite; border: 2px solid var(--line); border-radius: 50%;
+  border-top-color: var(--signal); height: 34px; width: 34px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 760px) {
+  .result-editor-page { padding: 30px 16px 70px; }
+  .editor-card { padding: 24px; }
+  .teams-grid, .options-grid { grid-template-columns: 1fr; }
+  .check-row { min-height: 46px; }
+}

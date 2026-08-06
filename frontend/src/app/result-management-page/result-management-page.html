@@ -1,0 +1,101 @@
+<main class="results-page">
+  @if (auth.checkingSession()) {
+    <section class="state-card"><span class="loader"></span><p>Sprawdzamy sesję…</p></section>
+  } @else if (!auth.username()) {
+    <section class="state-card">
+      <span class="eyebrow">Panel wyników</span>
+      <h1>Najpierw logowanie</h1>
+      <p>Zarządzanie wynikami jest dostępne tylko dla zalogowanego pracownika.</p>
+      <a routerLink="/employee">Przejdź do logowania →</a>
+    </section>
+  } @else {
+    <section class="page-head">
+      <div>
+        <a class="back-link" routerLink="/">← Wróć do portalu</a>
+        <span class="eyebrow">Redakcja</span>
+        <h1>Zarządzaj wynikami</h1>
+        <p>Wybierz, które wyniki mają być widoczne oraz ile wyników pokazywać dla każdego sportu.</p>
+      </div>
+      <a class="primary-link" routerLink="/employee/result/new">Dodaj wynik</a>
+    </section>
+
+    <section class="summary-strip">
+      <span>{{ results().length }} wyników łącznie</span>
+      <span>{{ visibleCount() }} widocznych</span>
+    </section>
+
+    @if (errorMessage()) {
+      <p class="form-error" role="alert">{{ errorMessage() }}</p>
+    }
+
+    <section class="settings-card">
+      <span class="eyebrow">Limity</span>
+      <div class="settings-grid">
+        @for (setting of settings(); track setting.category) {
+          <label>
+            <span>{{ settingLabel(setting) }}</span>
+            <input
+              type="number"
+              min="0"
+              max="20"
+              [ngModel]="setting.visible_limit"
+              (change)="updateLimit(setting, $any($event.target).value)"
+            />
+          </label>
+        }
+      </div>
+    </section>
+
+    @if (loading()) {
+      <section class="state-card"><span class="loader"></span><p>Ładujemy wyniki…</p></section>
+    } @else {
+      <section class="table-card">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Wynik</th>
+                <th>Sport</th>
+                <th>Status</th>
+                <th>Widoczność</th>
+                <th>Akcje</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (result of results(); track result.id) {
+                <tr [class.hidden-row]="!result.visible">
+                  <td>
+                    <strong>{{ result.home.name }} {{ result.home.score ?? '–' }} : {{ result.away.score ?? '–' }} {{ result.away.name }}</strong>
+                    <span>{{ result.home.short_name }} vs {{ result.away.short_name }}</span>
+                  </td>
+                  <td>{{ result.discipline }}</td>
+                  <td>
+                    <button class="status-toggle" type="button" [class.live]="result.is_live" [disabled]="busyId() === result.id" (click)="toggleStatus(result)">
+                      {{ result.is_live ? 'LIVE' : 'Koniec' }}
+                    </button>
+                  </td>
+                  <td>
+                    <span class="pill" [class.off]="!result.visible">{{ result.visible ? 'Widoczny' : 'Ukryty' }}</span>
+                  </td>
+                  <td>
+                    <div class="row-actions">
+                      <a [routerLink]="['/employee/result', result.id, 'edit']">Edytuj</a>
+                      <button type="button" [disabled]="busyId() === result.id" (click)="toggleVisible(result)">
+                        {{ result.visible ? 'Ukryj' : 'Pokaż' }}
+                      </button>
+                      <button class="danger" type="button" [disabled]="busyId() === result.id" (click)="deleteResult(result)">
+                        Usuń
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="5" class="empty-cell">Nie ma jeszcze wyników.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+</main>

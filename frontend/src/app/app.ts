@@ -3,6 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from './auth.service';
+import { relativePublishedAt } from './date-format';
 
 @Component({
   selector: 'app-root',
@@ -17,6 +18,7 @@ export class App {
 
   protected readonly routedPage = signal(this.router.url !== '/');
   protected readonly menuOpen = signal(false);
+  protected readonly userMenuOpen = signal(false);
   protected readonly searchOpen = signal(false);
   protected readonly searchPhrase = signal('');
   protected readonly selectedCategory = signal('Wszystkie');
@@ -36,22 +38,45 @@ export class App {
     );
   });
   protected readonly featuredArticle = computed(() =>
-    this.filteredArticles().find((item) => item.featured) ?? this.filteredArticles()[0]
+    this.selectedCategory() === 'Wszystkie'
+      ? this.filteredArticles().find((item) => item.featured) ?? this.filteredArticles()[0]
+      : this.filteredArticles().find((item) => item.category_featured) ?? this.filteredArticles()[0]
   );
+  protected readonly filteredMatches = computed(() => {
+    const category = this.selectedCategory();
+    return this.matches().filter((match) => category === 'Wszystkie' || match.discipline === category || match.category === category);
+  });
 
   constructor() {
     this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd) {
-        this.routedPage.set(event.urlAfterRedirects !== '/');
+        const onHomePage = event.urlAfterRedirects === '/';
+        this.routedPage.set(!onHomePage);
         this.menuOpen.set(false);
+        this.userMenuOpen.set(false);
         this.searchOpen.set(false);
+        if (onHomePage) {
+          this.loadHome();
+        }
         window.scrollTo({ top: 0, behavior: 'instant' });
       }
     });
+    this.loadHome();
+  }
+
+  private loadHome(): void {
+    if (!this.articles().length) {
+      this.loading.set(true);
+    }
+    this.error.set(false);
     this.http.get<HomeData>('/api/home').subscribe({
       next: (data) => {
         this.articles.set(data.articles);
-        this.matches.set(data.matches);
+        if (this.selectedCategory() === 'Wszystkie') {
+          this.matches.set(data.matches);
+        } else {
+          this.loadMatchesForCategory(this.selectedCategory());
+        }
         this.standings.set(data.standings);
         this.loading.set(false);
       },
@@ -65,11 +90,38 @@ export class App {
   protected selectCategory(category: string): void {
     this.selectedCategory.set(category);
     this.menuOpen.set(false);
+    if (this.routedPage()) {
+      this.router.navigate(['/']);
+    } else {
+      this.loadMatchesForCategory(category);
+    }
+  }
+
+  private loadMatchesForCategory(category: string): void {
+    const url = category === 'Wszystkie'
+      ? '/api/matches'
+      : `/api/matches?category=${encodeURIComponent(category)}`;
+    this.http.get<Match[]>(url).subscribe({
+      next: (matches) => this.matches.set(matches),
+      error: () => this.error.set(true),
+    });
   }
 
   protected toggleSearch(): void {
+    this.userMenuOpen.set(false);
     this.searchOpen.update((open) => !open);
     if (!this.searchOpen()) this.searchPhrase.set('');
+  }
+
+  protected toggleUserMenu(): void {
+    this.searchOpen.set(false);
+    this.userMenuOpen.update((open) => !open);
+  }
+
+  protected logout(): void {
+    this.auth.logout();
+    this.userMenuOpen.set(false);
+    this.router.navigate(['/']);
   }
 
   protected setSearch(event: Event): void {
@@ -79,10 +131,14 @@ export class App {
   protected scrollToNews(): void {
     document.querySelector('#news')?.scrollIntoView({ behavior: 'smooth' });
   }
+
+  protected publishedLabel(value: string): string {
+    return relativePublishedAt(value);
+  }
 }
 
 interface Team { name: string; short_name: string; score: number | null; }
-interface Match { id: number; discipline: string; status: 'LIVE' | 'NADCHODZĄCY' | 'ZAKOŃCZONY'; time: string; home: Team; away: Team; }
-interface Article { id: number; category: string; title: string; excerpt: string; published_at: string; reading_time: number; featured: boolean; accent: string; image_url?: string; }
+interface Match { id: number; discipline: string; category?: string; status: string; time: string; is_live: boolean; visible: boolean; home: Team; away: Team; }
+interface Article { id: number; category: string; title: string; excerpt: string; published_at: string; reading_time: number; featured: boolean; category_featured: boolean; hidden: boolean; accent: string; author: string; image_url?: string; image_alt?: string; }
 interface Standing { position: number; team: string; played: number; points: number; }
 interface HomeData { articles: Article[]; matches: Match[]; standings: Standing[]; }

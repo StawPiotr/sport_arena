@@ -3,6 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
+import { AuthService } from '../auth.service';
+import { exactPublishedAt } from '../date-format';
 
 interface Article {
   id: number;
@@ -16,7 +18,15 @@ interface Article {
   image_url: string | null;
   image_alt: string | null;
   content: string[];
+  blocks: ArticleBlock[];
   quote: string | null;
+}
+
+interface ArticleBlock {
+  type: 'text' | 'image';
+  content?: string;
+  src?: string;
+  alt?: string;
 }
 
 @Component({
@@ -28,6 +38,7 @@ interface Article {
 export class ArticlePage {
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
+  protected readonly auth = inject(AuthService);
 
   protected readonly article = signal<Article | null>(null);
   protected readonly loading = signal(true);
@@ -53,5 +64,9 @@ export class ArticlePage {
           this.loading.set(false);
         },
       });
+  }
+
+  protected exactDate(value: string): string {
+    return exactPublishedAt(value);
   }
 }

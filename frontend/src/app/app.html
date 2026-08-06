@@ -12,7 +12,20 @@
     </nav>
     <div class="header-actions">
       @if (auth.username(); as username) {
-        <span class="user-chip"><span></span>{{ username }}</span>
+        <div class="user-menu">
+          <button class="user-chip" type="button" (click)="toggleUserMenu()" [attr.aria-expanded]="userMenuOpen()">
+            <span></span>{{ username }}
+          </button>
+          @if (userMenuOpen()) {
+            <div class="user-dropdown">
+              <a routerLink="/employee/articles">Zarządzaj artykułami</a>
+              <a routerLink="/employee/article/new">Dodaj nowy artykuł</a>
+              <a routerLink="/employee/results">Zarządzaj wynikami</a>
+              <a routerLink="/employee/result/new">Dodaj nowy wynik</a>
+              <button type="button" (click)="logout()">Wyloguj się</button>
+            </div>
+          }
+        </div>
       }
       <button class="icon-button" type="button" aria-label="Szukaj" (click)="toggleSearch()">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16.2 16.2 4.3 4.3"></path></svg>
@@ -38,15 +51,17 @@
     } @else if (error()) {
       <div class="state-card error"><strong>Nie udało się połączyć z API.</strong><p>Uruchom backend na porcie 8000 i odśwież stronę.</p></div>
     } @else {
-      <section class="score-strip" aria-label="Wyniki meczów">
-        <div class="section-label"><span class="pulse"></span>Na żywo</div>
+      <section class="score-strip" aria-label="Wyniki">
+        <div class="section-label"><span class="pulse"></span>Wyniki</div>
         <div class="matches">
-          @for (match of matches(); track match.id) {
+          @for (match of filteredMatches(); track match.id) {
             <article class="match-card">
-              <div class="match-meta"><span>{{ match.discipline }}</span><span [class.live]="match.status === 'LIVE'">{{ match.time }}</span></div>
+              <div class="match-meta"><span>{{ match.discipline }}</span><span [class.live]="match.is_live || match.status === 'LIVE'">{{ match.time }}</span></div>
               <div class="team-row"><span class="team-badge">{{ match.home.short_name.slice(0, 1) }}</span><strong>{{ match.home.name }}</strong><b>{{ match.home.score ?? '–' }}</b></div>
               <div class="team-row"><span class="team-badge alt">{{ match.away.short_name.slice(0, 1) }}</span><strong>{{ match.away.name }}</strong><b>{{ match.away.score ?? '–' }}</b></div>
             </article>
+          } @empty {
+            <div class="empty-state compact"><strong>Brak wyników</strong><span>Nie wybrano jeszcze wyników dla tej sekcji.</span></div>
           }
         </div>
       </section>
@@ -58,7 +73,7 @@
               <span class="eyebrow">{{ featured.category }} · Najważniejsze</span>
               <h1>{{ featured.title }}</h1>
               <p>{{ featured.excerpt }}</p>
-              <div class="story-meta"><span>{{ featured.published_at }}</span><span>{{ featured.reading_time }} min czytania</span></div>
+              <div class="story-meta"><span>{{ featured.author }} · {{ publishedLabel(featured.published_at) }}</span><span>{{ featured.reading_time }} min czytania</span></div>
               <button type="button" class="primary-button" [routerLink]="['/artykul', featured.id]">Czytaj artykuł <span>↗</span></button>
             </div>
             <div class="hero-visual" aria-hidden="true">
@@ -79,12 +94,17 @@
           <div class="article-grid">
             @for (article of filteredArticles(); track article.id) {
               <a class="article-card" [style.--accent]="article.accent" [routerLink]="['/artykul', article.id]">
-                <div class="article-art"><span>{{ article.category }}</span><div class="art-number">0{{ article.id }}</div></div>
+                <div class="article-art">
+                  @if (article.image_url) {
+                    <img [src]="article.image_url" [alt]="article.image_alt ?? ''" />
+                  }
+                  <span>{{ article.category }}</span><div class="art-number">{{ article.id.toString().padStart(2, '0') }}</div>
+                </div>
                 <div class="article-body">
                   <span class="category">{{ article.category }}</span>
                   <h3>{{ article.title }}</h3>
                   <p>{{ article.excerpt }}</p>
-                  <div class="story-meta"><span>{{ article.published_at }}</span><span>{{ article.reading_time }} min</span></div>
+                  <div class="story-meta"><span>{{ article.author }} · {{ publishedLabel(article.published_at) }}</span><span>{{ article.reading_time }} min</span></div>
                 </div>
               </a>
             } @empty {

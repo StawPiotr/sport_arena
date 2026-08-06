@@ -10,7 +10,12 @@
     </div>
   } @else if (article(); as item) {
     <article [style.--accent]="item.accent">
-      <a class="back-link" routerLink="/">← Wszystkie wiadomości</a>
+      <div class="article-actions">
+        <a class="back-link" routerLink="/">← Wszystkie wiadomości</a>
+        @if (auth.username()) {
+          <a class="edit-link" [routerLink]="['/employee/article', item.id, 'edit']">Edytuj</a>
+        }
+      </div>
 
       <header class="article-header">
         <span class="category">{{ item.category }}</span>
@@ -18,7 +23,7 @@
         <p class="lead">{{ item.excerpt }}</p>
         <div class="byline">
           <div class="author-avatar">{{ item.author.slice(0, 1) }}</div>
-          <div><strong>{{ item.author }}</strong><span>{{ item.published_at }} · {{ item.reading_time }} min czytania</span></div>
+          <div><strong>{{ item.author }}</strong><span>Dodano: {{ exactDate(item.published_at) }} · {{ item.reading_time }} min czytania</span></div>
         </div>
       </header>
 
@@ -37,13 +42,30 @@
           <button type="button" aria-label="Skopiuj link">↗</button>
         </aside>
         <div class="article-content">
-          @for (paragraph of item.content; track $index) {
-            <p>{{ paragraph }}</p>
-            @if ($index === 1 && item.quote) {
-              <blockquote>{{ item.quote }}</blockquote>
+          @if (item.blocks.length) {
+            @for (block of item.blocks; track $index) {
+              @if (block.type === 'text') {
+                <p>{{ block.content }}</p>
+                @if ($index === 1 && item.quote) {
+                  <blockquote>{{ item.quote }}</blockquote>
+                }
+              } @else if (block.src) {
+                <figure class="inline-image">
+                  <img [src]="block.src" [alt]="block.alt ?? item.title" />
+                  @if (block.alt) {
+                    <figcaption>{{ block.alt }}</figcaption>
+                  }
+                </figure>
+              }
             }
-          }
-          @if (!item.content.length) {
+          } @else if (item.content.length) {
+            @for (paragraph of item.content; track $index) {
+              <p>{{ paragraph }}</p>
+              @if ($index === 1 && item.quote) {
+                <blockquote>{{ item.quote }}</blockquote>
+              }
+            }
+          } @else {
             <p>{{ item.excerpt }}</p>
             <p>Pełna treść tego materiału pojawi się wkrótce.</p>
           }
