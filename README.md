@@ -24,6 +24,27 @@ npm start
 Portal: `http://localhost:4200`  
 Dokumentacja API: `http://localhost:8000/docs`
 
+## Deploy na Railway
+
+Projekt jest przygotowany do wdrożenia jako jedna usługa Railway przez `Dockerfile`
+w katalogu głównym repozytorium. Docker buduje frontend Angular, kopiuje wynik do
+obrazu backendu i uruchamia FastAPI, które serwuje zarówno API `/api`, jak i
+portal.
+
+W Railway:
+
+1. Utwórz nowy projekt z repozytorium.
+2. Railway powinien wykryć `railway.json` i użyć `Dockerfile`.
+3. Dodaj volume dla trwałej bazy SQLite i zamontuj go pod `/data`.
+4. Ustaw zmienną środowiskową:
+
+```text
+ARENA_DB_PATH=/data/arena.db
+```
+
+Jeśli nie dodasz volume, aplikacja wystartuje, ale baza SQLite będzie nietrwała
+po redeployu lub restarcie kontenera.
+
 ## Strefa pracownika
 
 Podstrona logowania nie jest widoczna w nawigacji portalu:

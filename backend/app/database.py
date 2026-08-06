@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -7,11 +8,14 @@ from pathlib import Path
 from typing import Any
 
 
-DATABASE_PATH = Path(__file__).resolve().parents[1] / "arena.db"
+DATABASE_PATH = Path(
+    os.getenv("ARENA_DB_PATH", str(Path(__file__).resolve().parents[1] / "arena.db"))
+)
 SEED_VERSION = "1"
 
 
 def connect() -> sqlite3.Connection:
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")

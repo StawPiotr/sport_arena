@@ -1,8 +1,11 @@
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 from secrets import token_urlsafe
 from typing import Literal
 
 from fastapi import FastAPI, Header, HTTPException, status
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -609,3 +612,26 @@ def current_user(authorization: str | None = Header(default=None)) -> UserRespon
 def logout(authorization: str | None = Header(default=None)) -> None:
     user = session_user(authorization)
     ACTIVE_SESSIONS.pop(user["token"], None)
+
+
+STATIC_DIR = Path(
+    os.getenv(
+        "ARENA_STATIC_DIR",
+        str(Path(__file__).resolve().parents[2] / "frontend" / "dist" / "frontend" / "browser"),
+    )
+)
+INDEX_HTML = STATIC_DIR / "index.html"
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def frontend(full_path: str) -> FileResponse:
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Nie znaleziono endpointu API")
+    if not INDEX_HTML.exists():
+        raise HTTPException(status_code=404, detail="Frontend nie jest zbudowany")
+
+    static_root = STATIC_DIR.resolve()
+    requested = (STATIC_DIR / full_path).resolve()
+    if requested.is_file() and str(requested).startswith(str(static_root)):
+        return FileResponse(requested)
+    return FileResponse(INDEX_HTML)
