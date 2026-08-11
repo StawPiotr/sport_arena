@@ -126,7 +126,7 @@ export class XEmbed implements AfterViewInit, OnChanges {
     const isReel = this.isFacebookReel(raw || facebookUrl);
     const width = pluginType === 'video' && isReel ? 267 : 500;
     const height = pluginType === 'video' && isReel ? 476 : pluginType === 'video' ? 620 : 760;
-    const src = `https://www.facebook.com/plugins/${pluginType}.php?href=${encodeURIComponent(facebookUrl)}&show_text=true&width=${width}`;
+    const src = this.facebookPluginUrl(pluginType, facebookUrl, width, 'true');
 
     return this.safeIframeHtml(src, 'Osadzony post z Facebooka', 'facebook-iframe', height, width);
   }
@@ -151,16 +151,22 @@ export class XEmbed implements AfterViewInit, OnChanges {
         const isReel = this.isFacebookReel(href);
         const width = pluginType === 'video' && isReel ? 267 : 500;
         const height = pluginType === 'video' && isReel ? 476 : pluginType === 'video' ? 620 : 760;
-        const src = `https://www.facebook.com/plugins/${pluginType}.php?href=${encodeURIComponent(this.cleanHtmlUrl(href))}&show_text=true&width=${width}`;
+        const src = this.facebookPluginUrl(pluginType, this.cleanHtmlUrl(href), width, 'true');
         return this.safeIframeHtml(src, 'Osadzony post z Facebooka', 'facebook-iframe', height, width);
       }
     }
 
     const iframe = document.querySelector('iframe[src*="facebook.com/plugins/"]') as HTMLIFrameElement | null;
     if (!iframe?.src) return '';
-    const width = Number(iframe.getAttribute('width')) || (iframe.src.includes('/video.php') && this.isFacebookReel(iframe.src) ? 267 : 500);
-    const height = Number(iframe.getAttribute('height')) || (iframe.src.includes('/video.php') ? 620 : 760);
-    return this.safeIframeHtml(iframe.src, 'Osadzony post z Facebooka', 'facebook-iframe', height, width);
+    const pluginType = iframe.src.includes('/video.php') ? 'video' : 'post';
+    const originalWidth = Number(iframe.getAttribute('width')) || 0;
+    const originalHeight = Number(iframe.getAttribute('height')) || 0;
+    const hasOriginalRatio = originalWidth > 0 && originalHeight > 0;
+    const isPortraitReel = pluginType === 'video' && this.isFacebookReel(iframe.src) && (!hasOriginalRatio || originalHeight > originalWidth);
+    const width = isPortraitReel ? 267 : originalWidth || 500;
+    const height = isPortraitReel ? 476 : originalHeight || (pluginType === 'video' ? 620 : 760);
+    const src = isPortraitReel ? this.rebuildFacebookPluginIframeSrc(iframe.src, pluginType, width) : iframe.src;
+    return this.safeIframeHtml(src, 'Osadzony post z Facebooka', 'facebook-iframe', height, width);
   }
 
   private extractInstagramUrl(value: string): string {
@@ -202,9 +208,10 @@ export class XEmbed implements AfterViewInit, OnChanges {
   private safeIframeHtml(src: string, title: string, className = 'generic-iframe', height?: number, width?: number): string {
     const heightAttribute = height ? ` height="${height}"` : '';
     const widthAttribute = width ? ` width="${width}"` : '';
+    const sizeStyle = className.includes('facebook') && width && height ? ` style="width:${width}px;height:${height}px"` : '';
     const loading = className.includes('facebook') ? 'eager' : 'lazy';
     const scrolling = className.includes('facebook') ? 'no' : 'auto';
-    return `<iframe class="social-iframe ${className}" src="${this.escapeAttribute(src)}" title="${this.escapeAttribute(title)}" loading="${loading}" scrolling="${scrolling}" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen${widthAttribute}${heightAttribute}></iframe>`;
+    return `<iframe class="social-iframe ${className}" src="${this.escapeAttribute(src)}" title="${this.escapeAttribute(title)}" loading="${loading}" scrolling="${scrolling}" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen${widthAttribute}${heightAttribute}${sizeStyle}></iframe>`;
   }
 
   private renderTweet(): void {
@@ -318,6 +325,25 @@ export class XEmbed implements AfterViewInit, OnChanges {
 
   private isFacebookReel(value: string): boolean {
     return /\/reel\/|plugins\/video\.php[^"'<>]*%2Freel%2F|plugins\/video\.php[^"'<>]*\/reel\//i.test(value);
+  }
+
+  private facebookPluginUrl(pluginType: 'post' | 'video', facebookUrl: string, width: number, showText: string): string {
+    return `https://www.facebook.com/plugins/${pluginType}.php?href=${encodeURIComponent(facebookUrl)}&show_text=${showText}&width=${width}`;
+  }
+
+  private rebuildFacebookPluginIframeSrc(src: string, pluginType: 'post' | 'video', width: number): string {
+    const url = new URL(src);
+    const href = url.searchParams.get('href');
+    if (!href) return src;
+
+    const showText = url.searchParams.get('show_text') ?? 'false';
+    const rebuilt = new URL(`https://www.facebook.com/plugins/${pluginType}.php`);
+    rebuilt.searchParams.set('href', href);
+    rebuilt.searchParams.set('show_text', showText);
+    rebuilt.searchParams.set('width', String(width));
+    const time = url.searchParams.get('t');
+    if (time) rebuilt.searchParams.set('t', time);
+    return rebuilt.toString();
   }
 
   private escapeAttribute(value: string): string {
