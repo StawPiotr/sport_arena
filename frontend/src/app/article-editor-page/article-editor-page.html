@@ -88,6 +88,7 @@
           <div class="block-actions">
             <button type="button" (click)="addTextBlock()">+ Tekst</button>
             <button type="button" (click)="addImageBlock()">+ Zdjęcie</button>
+            <button type="button" (click)="addEmbedBlock()">+ Post</button>
           </div>
         </div>
 
@@ -95,7 +96,7 @@
           @for (block of blocks(); track $index) {
             <article class="content-block">
               <div class="block-toolbar">
-                <strong>{{ block.type === 'text' ? 'Blok tekstowy' : 'Blok zdjęcia' }}</strong>
+                <strong>{{ blockLabel(block) }}</strong>
                 <div>
                   <button type="button" [disabled]="$first" (click)="moveBlock($index, -1)">↑</button>
                   <button type="button" [disabled]="$last" (click)="moveBlock($index, 1)">↓</button>
@@ -105,16 +106,62 @@
 
               @if (block.type === 'text') {
                 <div class="mini-editor">
-                  <div class="editor-hint">Prosty edytor tekstu</div>
-                  <textarea
-                    rows="7"
-                    placeholder="Napisz akapit artykułu..."
-                    [name]="'blockText' + $index"
-                    [ngModel]="block.content"
-                    (ngModelChange)="updateBlock($index, { content: $event })"
-                  ></textarea>
+                  <div class="rich-toolbar" aria-label="Formatowanie tekstu">
+                    <button type="button" title="Pogrubienie" (mousedown)="$event.preventDefault()" (click)="formatText('bold')"><strong>B</strong></button>
+                    <button type="button" title="Kursywa" (mousedown)="$event.preventDefault()" (click)="formatText('italic')"><em>I</em></button>
+                    <button type="button" title="Podkreślenie" (mousedown)="$event.preventDefault()" (click)="formatText('underline')"><u>U</u></button>
+                    <button type="button" title="Przekreślenie" (mousedown)="$event.preventDefault()" (click)="formatText('strikeThrough')"><s>S</s></button>
+                    <button type="button" title="Cytat" (mousedown)="$event.preventDefault()" (click)="formatText('formatBlock', 'blockquote')">Cytat</button>
+                    <button type="button" title="Akapit" (mousedown)="$event.preventDefault()" (click)="formatText('formatBlock', 'p')">Akapit</button>
+                    <div class="color-picker">
+                      <input
+                        type="color"
+                        title="Wybierz kolor"
+                        [ngModel]="textColor()"
+                        [ngModelOptions]="{ standalone: true }"
+                        (mousedown)="rememberSelection()"
+                        (ngModelChange)="setTextColor($event); applyTextColor($event)"
+                      />
+                      <input
+                        type="text"
+                        maxlength="7"
+                        placeholder="#dfff3f"
+                        [ngModel]="textColor()"
+                        [ngModelOptions]="{ standalone: true }"
+                        (mousedown)="rememberSelection()"
+                        (ngModelChange)="setTextColor($event)"
+                        (keydown.enter)="$event.preventDefault(); applyTextColor()"
+                        (blur)="applyTextColor()"
+                      />
+                    </div>
+                    <div class="suggested-colors" aria-label="Proponowane kolory">
+                      @for (color of suggestedColors; track color) {
+                        <button
+                          type="button"
+                          class="color-swatch"
+                          [style.background]="color"
+                          [title]="color"
+                          (mousedown)="$event.preventDefault()"
+                          (click)="applyTextColor(color)"
+                        ></button>
+                      }
+                    </div>
+                    <button type="button" title="Wyczyść format" (mousedown)="$event.preventDefault()" (click)="formatText('removeFormat')">Wyczyść</button>
+                  </div>
+                  <div
+                    class="rich-editor"
+                    contenteditable="true"
+                    role="textbox"
+                    aria-multiline="true"
+                    data-placeholder="Napisz treść artykułu. Enter tworzy nowy akapit."
+                    [innerHTML]="block.content ?? ''"
+                    (blur)="updateTextBlock($index, $event)"
+                    (focus)="rememberSelection()"
+                    (keyup)="rememberSelection()"
+                    (mouseup)="rememberSelection()"
+                  ></div>
                 </div>
-              } @else {
+              } @else if (block.type === 'image') {
                 <div class="image-editor">
                   @if (block.src) {
                     <img [src]="block.src" [alt]="block.alt || 'Podgląd zdjęcia'" />
@@ -132,6 +179,34 @@
                     [ngModel]="block.alt"
                     (ngModelChange)="updateBlock($index, { alt: $event })"
                   />
+                </div>
+              } @else {
+                <div class="embed-editor">
+                  <label>
+                    <span>Typ posta</span>
+                    <select
+                      [name]="'embedProvider' + $index"
+                      [ngModel]="block.provider"
+                      (ngModelChange)="updateBlock($index, { provider: $event })"
+                    >
+                      <option value="X / Twitter">X / Twitter</option>
+                      <option value="Facebook">Facebook</option>
+                      <option value="Instagram">Instagram</option>
+                      <option value="YouTube">YouTube</option>
+                      <option value="Inny">Inny</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Link lub kod osadzenia</span>
+                    <textarea
+                      rows="7"
+                      placeholder="<blockquote class=&quot;twitter-tweet&quot;>...</blockquote> albo https://..."
+                      [name]="'embedContent' + $index"
+                      [ngModel]="block.content ?? block.url"
+                      (ngModelChange)="updateBlock($index, { content: $event, url: $event })"
+                    ></textarea>
+                  </label>
+                  <p>Możesz wkleić sam link albo pełny kod embed z platformy. X/Twitter zostanie wyrenderowany jako natywny post z profilem, a skrypty z wklejki są ignorowane i ładowane bezpiecznie przez portal.</p>
                 </div>
               }
             </article>

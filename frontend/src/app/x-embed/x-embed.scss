@@ -1,0 +1,49 @@
+:host {
+  display: flex;
+  justify-content: center;
+  margin: 42px 0;
+}
+
+.x-native {
+  display: flex;
+  justify-content: center;
+  max-width: 560px;
+  min-height: 120px;
+  width: 100%;
+}
+
+.x-native ::ng-deep .twitter-tweet,
+.x-native ::ng-deep iframe,
+.x-native ::ng-deep .instagram-media,
+.x-native ::ng-deep .fb-post,
+.x-native ::ng-deep .fb-video {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.x-native ::ng-deep .social-iframe {
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 12px;
+  display: block;
+  max-width: 560px;
+  width: 100%;
+}
+
+.x-native ::ng-deep .facebook-iframe {
+  aspect-ratio: auto;
+  background: #fff;
+  max-width: 100%;
+  width: auto;
+}
+
+.x-link {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 14px 16px;
+  text-decoration: none;
+}

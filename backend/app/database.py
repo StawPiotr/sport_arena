@@ -224,6 +224,15 @@ def article_from_row(row: sqlite3.Row) -> dict[str, Any]:
                         "alt": str(item.get("alt", "")),
                     }
                 )
+            elif block_type == "embed":
+                blocks.append(
+                    {
+                        "type": "embed",
+                        "provider": str(item.get("provider", "Post")),
+                        "url": str(item.get("url", "")),
+                        "content": str(item.get("content", item.get("url", ""))),
+                    }
+                )
 
     return {
         "id": row["id"],

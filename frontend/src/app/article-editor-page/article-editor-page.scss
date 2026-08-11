@@ -34,7 +34,7 @@ label > span, .editor-hint {
   margin-bottom: 8px;
   text-transform: uppercase;
 }
-input, select, textarea {
+input, select, textarea, .rich-editor {
   background: #0f1112;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -47,7 +47,7 @@ input, select, textarea {
   width: 100%;
 }
 textarea { line-height: 1.6; resize: vertical; }
-input:focus, select:focus, textarea:focus { border-color: var(--signal); }
+input:focus, select:focus, textarea:focus, .rich-editor:focus { border-color: var(--signal); }
 .schedule-toggle {
   align-items: center;
   align-self: end;
@@ -93,8 +93,62 @@ h2 { font-size: 28px; letter-spacing: -1.2px; margin: 0; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 .mini-editor { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
 .editor-hint { color: var(--muted); }
-.mini-editor textarea { background: transparent; border: 0; padding: 0; }
-.image-editor { display: grid; gap: 12px; }
+.rich-toolbar { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+.rich-toolbar button {
+  background: #0f1112;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 900;
+  min-height: 32px;
+  padding: 7px 9px;
+}
+.rich-toolbar button:hover { border-color: var(--signal); color: var(--signal); }
+.color-picker, .suggested-colors { align-items: center; display: flex; gap: 6px; }
+.color-picker {
+  background: #0f1112;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 4px 6px;
+}
+.color-picker input[type="color"] {
+  border: 0;
+  border-radius: 4px;
+  height: 26px;
+  padding: 0;
+  width: 32px;
+}
+.color-picker input[type="text"] {
+  border: 0;
+  font-size: 10px;
+  padding: 0;
+  width: 72px;
+}
+.color-swatch {
+  border-radius: 50% !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  width: 26px;
+}
+.rich-editor {
+  line-height: 1.75;
+  min-height: 190px;
+  overflow-wrap: anywhere;
+}
+.rich-editor:empty::before {
+  color: var(--muted);
+  content: attr(data-placeholder);
+}
+.rich-editor p { margin: 0 0 14px; }
+.rich-editor blockquote {
+  border-left: 3px solid var(--signal);
+  margin: 18px 0;
+  padding-left: 18px;
+}
+.image-editor, .embed-editor { display: grid; gap: 12px; }
 .image-editor img, .image-placeholder {
   aspect-ratio: 16 / 7;
   border-radius: 8px;
@@ -127,6 +181,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 }
 .file-picker input { display: none; }
 .file-picker span { margin: 0; }
+.embed-editor p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0;
+}
 .form-error { color: #ff766c; font-size: 12px; margin: 0; }
 .submit-bar {
   align-items: center;

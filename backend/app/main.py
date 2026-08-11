@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from secrets import token_urlsafe
@@ -76,10 +77,12 @@ class Sport(BaseModel):
 
 
 class ArticleBlock(BaseModel):
-    type: Literal["text", "image"]
+    type: Literal["text", "image", "embed"]
     content: str | None = None
     src: str | None = None
     alt: str | None = None
+    provider: str | None = None
+    url: str | None = None
 
 
 class ArticleCreateRequest(BaseModel):
@@ -200,6 +203,58 @@ SPORTS = [
 ACTIVE_SESSIONS: dict[str, str] = {}
 init_database()
 
+
+def text_from_html(value: str) -> str:
+    return re.sub(r"<[^>]+>", " ", value).strip()
+
+
+def extract_first_url(value: str) -> str:
+    match = re.search(r"https?://[^\"'<>\s]+", value)
+    return match.group(0) if match else value.strip()
+
+
+def normalize_article_blocks(
+    payload: ArticleCreateRequest,
+    title: str,
+) -> tuple[list[dict[str, str]], str | None, str | None, int]:
+    normalized_blocks: list[dict[str, str]] = []
+    first_image_url: str | None = None
+    first_image_alt: str | None = None
+    word_count = 0
+
+    for block in payload.blocks:
+        if block.type == "text":
+            html = (block.content or "").strip()
+            text = text_from_html(html)
+            if not text:
+                continue
+            normalized_blocks.append({"type": "text", "content": html})
+            word_count += len(text.split())
+        if block.type == "image":
+            src = (block.src or "").strip()
+            if not src:
+                continue
+            alt = (block.alt or title).strip()
+            normalized_blocks.append({"type": "image", "src": src, "alt": alt})
+            if first_image_url is None:
+                first_image_url = src
+                first_image_alt = alt
+        if block.type == "embed":
+            embed_content = (block.content or block.url or "").strip()
+            if not embed_content:
+                continue
+            url = extract_first_url(embed_content)
+            normalized_blocks.append(
+                {
+                    "type": "embed",
+                    "provider": (block.provider or "Post").strip(),
+                    "url": url,
+                    "content": embed_content,
+                }
+            )
+
+    return normalized_blocks, first_image_url, first_image_alt, word_count
+
 app = FastAPI(
     title="Arena Sports API",
     description="Bazowe API dla portalu sportowego Arena.",
@@ -269,27 +324,7 @@ def add_article(
     if sport is None:
         raise HTTPException(status_code=400, detail="Nieznana kategoria sportu")
 
-    normalized_blocks: list[dict[str, str]] = []
-    first_image_url: str | None = None
-    first_image_alt: str | None = None
-    word_count = 0
-
-    for block in payload.blocks:
-        if block.type == "text":
-            text = (block.content or "").strip()
-            if not text:
-                continue
-            normalized_blocks.append({"type": "text", "content": text})
-            word_count += len(text.split())
-        if block.type == "image":
-            src = (block.src or "").strip()
-            if not src:
-                continue
-            alt = (block.alt or title).strip()
-            normalized_blocks.append({"type": "image", "src": src, "alt": alt})
-            if first_image_url is None:
-                first_image_url = src
-                first_image_alt = alt
+    normalized_blocks, first_image_url, first_image_alt, word_count = normalize_article_blocks(payload, title)
 
     if not normalized_blocks or not any(item["type"] == "text" for item in normalized_blocks):
         raise HTTPException(
@@ -342,27 +377,7 @@ def edit_article(
     if sport is None:
         raise HTTPException(status_code=400, detail="Nieznana kategoria sportu")
 
-    normalized_blocks: list[dict[str, str]] = []
-    first_image_url: str | None = None
-    first_image_alt: str | None = None
-    word_count = 0
-
-    for block in payload.blocks:
-        if block.type == "text":
-            text = (block.content or "").strip()
-            if not text:
-                continue
-            normalized_blocks.append({"type": "text", "content": text})
-            word_count += len(text.split())
-        if block.type == "image":
-            src = (block.src or "").strip()
-            if not src:
-                continue
-            alt = (block.alt or title).strip()
-            normalized_blocks.append({"type": "image", "src": src, "alt": alt})
-            if first_image_url is None:
-                first_image_url = src
-                first_image_alt = alt
+    normalized_blocks, first_image_url, first_image_alt, word_count = normalize_article_blocks(payload, title)
 
     if not normalized_blocks or not any(item["type"] == "text" for item in normalized_blocks):
         raise HTTPException(

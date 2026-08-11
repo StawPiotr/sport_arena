@@ -1,0 +1,5 @@
+@if (embedHtml) {
+  <div #tweetContainer class="x-native" [class]="'x-native platform-' + platform" [innerHTML]="embedHtml"></div>
+} @else if (embedUrl || failed) {
+  <a class="x-link" [href]="embedUrl" target="_blank" rel="noopener noreferrer">Otwórz osadzony post</a>
+}

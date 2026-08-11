@@ -45,7 +45,7 @@
           @if (item.blocks.length) {
             @for (block of item.blocks; track $index) {
               @if (block.type === 'text') {
-                <p>{{ block.content }}</p>
+                <div class="rich-content" [innerHTML]="block.content"></div>
                 @if ($index === 1 && item.quote) {
                   <blockquote>{{ item.quote }}</blockquote>
                 }
@@ -56,6 +56,29 @@
                     <figcaption>{{ block.alt }}</figcaption>
                   }
                 </figure>
+              } @else if (block.type === 'embed' && (block.url || block.content)) {
+                @if (embedView(block); as embed) {
+                  @if (embed.kind === 'youtube') {
+                    <figure class="youtube-embed">
+                      <iframe
+                        [src]="embed.iframeUrl"
+                        title="Osadzony film YouTube"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen
+                      ></iframe>
+                    </figure>
+                  } @else if (embed.kind === 'social') {
+                    <app-x-embed [content]="block.content ?? ''" [provider]="block.provider ?? ''" [url]="block.url ?? ''"></app-x-embed>
+                  } @else {
+                    <aside class="embedded-post">
+                      <span>{{ embed.provider }}</span>
+                      <div class="embed-body">
+                        <p>{{ embed.text }}</p>
+                        <a [href]="embed.url" target="_blank" rel="noopener noreferrer">{{ embed.url }}</a>
+                      </div>
+                    </aside>
+                  }
+                }
               }
             }
           } @else if (item.content.length) {

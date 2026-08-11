@@ -13,10 +13,12 @@ interface Sport {
 }
 
 interface ArticleBlock {
-  type: 'text' | 'image';
+  type: 'text' | 'image' | 'embed';
   content?: string;
   src?: string;
   alt?: string;
+  provider?: string;
+  url?: string;
 }
 
 interface CreatedArticle {
@@ -60,6 +62,18 @@ export class ArticleEditorPage {
   protected readonly submitting = signal(false);
   protected readonly errorMessage = signal('');
   protected readonly editing = signal(Boolean(this.articleId));
+  protected readonly textColor = signal('#dfff3f');
+  protected readonly suggestedColors = [
+    '#dfff3f',
+    '#ffffff',
+    '#b8c0bd',
+    '#ff7a45',
+    '#ff6259',
+    '#66d9ff',
+    '#b48cff',
+    '#50e3a4',
+  ];
+  private savedSelection: Range | null = null;
 
   constructor() {
     this.http
@@ -93,6 +107,49 @@ export class ArticleEditorPage {
 
   protected addImageBlock(): void {
     this.blocks.update((blocks) => [...blocks, { type: 'image', src: '', alt: '' }]);
+  }
+
+  protected addEmbedBlock(): void {
+    this.blocks.update((blocks) => [...blocks, { type: 'embed', provider: 'X / Twitter', url: '' }]);
+  }
+
+  protected formatText(command: string, value?: string): void {
+    this.restoreSelection();
+    document.execCommand(command, false, value);
+    this.rememberSelection();
+  }
+
+  protected applyTextColor(color = this.textColor()): void {
+    const normalized = this.normalizeHexColor(color);
+    this.textColor.set(normalized);
+    this.formatText('foreColor', normalized);
+  }
+
+  protected rememberSelection(): void {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const element = container.nodeType === Node.ELEMENT_NODE
+      ? container as Element
+      : container.parentElement;
+    if (element?.closest('.rich-editor')) {
+      this.savedSelection = range.cloneRange();
+    }
+  }
+
+  protected setTextColor(value: string): void {
+    this.textColor.set(this.normalizeHexColor(value));
+  }
+
+  protected updateTextBlock(index: number, event: Event): void {
+    this.updateBlock(index, { content: (event.target as HTMLElement).innerHTML });
+  }
+
+  protected blockLabel(block: ArticleBlock): string {
+    if (block.type === 'text') return 'Blok tekstowy';
+    if (block.type === 'image') return 'Blok zdjęcia';
+    return 'Osadzony post';
   }
 
   protected updateBlock(index: number, patch: Partial<ArticleBlock>): void {
@@ -130,6 +187,7 @@ export class ArticleEditorPage {
   }
 
   protected submit(): void {
+    (document.activeElement as HTMLElement | null)?.blur();
     this.errorMessage.set('');
 
     const title = this.title().trim();
@@ -157,13 +215,25 @@ export class ArticleEditorPage {
         if (block.type === 'text') {
           return { type: 'text' as const, content: (block.content ?? '').trim() };
         }
+        if (block.type === 'embed') {
+          return {
+            type: 'embed' as const,
+            provider: (block.provider ?? 'Post').trim(),
+            url: (block.url ?? '').trim(),
+            content: (block.content ?? '').trim(),
+          };
+        }
         return {
           type: 'image' as const,
           src: (block.src ?? '').trim(),
           alt: (block.alt ?? title).trim(),
         };
       })
-      .filter((block) => block.type === 'text' ? block.content : block.src);
+      .filter((block) => {
+        if (block.type === 'text') return block.content;
+        if (block.type === 'embed') return block.content || block.url;
+        return block.src;
+      });
 
     if (!payloadBlocks.some((block) => block.type === 'text')) {
       this.errorMessage.set('Dodaj przynajmniej jeden blok tekstowy.');
@@ -216,6 +286,21 @@ export class ArticleEditorPage {
     if (Number.isNaN(date.getTime())) return '';
     const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
     return local.toISOString().slice(0, 16);
+  }
+
+  private normalizeHexColor(value: string): string {
+    const color = value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) return color;
+    if (/^[0-9a-fA-F]{6}$/.test(color)) return `#${color}`;
+    return '#dfff3f';
+  }
+
+  private restoreSelection(): void {
+    if (!this.savedSelection) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    selection.removeAllRanges();
+    selection.addRange(this.savedSelection);
   }
 
   private apiErrorMessage(error: unknown): string {

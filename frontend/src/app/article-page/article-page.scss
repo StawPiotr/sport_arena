@@ -70,6 +70,17 @@ figcaption { color: var(--muted); font-size: 9px; letter-spacing: .5px; margin-t
   color: var(--accent); float: left; font-size: 72px; font-weight: 900; line-height: .72;
   margin: 12px 12px 0 0;
 }
+.rich-content { color: #d1d4d1; font-size: 17px; line-height: 1.85; margin: 0 0 27px; }
+.rich-content p { margin: 0 0 22px; }
+.rich-content blockquote {
+  border-left: 3px solid var(--accent);
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 38px 0;
+  padding-left: 24px;
+}
 .inline-image { margin: 42px 0; }
 .inline-image img {
   aspect-ratio: 16 / 9;
@@ -84,6 +95,46 @@ figcaption { color: var(--muted); font-size: 9px; letter-spacing: .5px; margin-t
   letter-spacing: .5px;
   margin-top: 10px;
   text-transform: uppercase;
+}
+.embedded-post {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  margin: 38px 0;
+  padding: 20px;
+}
+.embedded-post span {
+  color: var(--accent);
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+.embed-body { color: #d1d4d1; font-size: 15px; line-height: 1.65; }
+.embed-body p { margin: 0 0 10px; }
+.embed-body a { color: var(--ink); font-size: 13px; overflow-wrap: anywhere; }
+.embed-body blockquote, .embed-body .twitter-tweet {
+  background: #0f1112;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 9px;
+  margin: 0;
+  padding: 18px;
+}
+.embed-body iframe { border: 0; border-radius: 9px; max-width: 100%; }
+.youtube-embed {
+  margin: 42px 0;
+}
+.youtube-embed iframe {
+  aspect-ratio: 16 / 9;
+  background: #0f1112;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: block;
+  width: 100%;
 }
 blockquote {
   border-left: 3px solid var(--accent); color: var(--ink); font-size: 27px; font-weight: 700;
