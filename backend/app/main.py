@@ -81,7 +81,7 @@ class Article(BaseModel):
     featured_image_url: str | None = None
     featured_image_alt: str | None = None
     content: list[str] = Field(default_factory=list)
-    blocks: list[dict[str, str]] = Field(default_factory=list)
+    blocks: list[dict[str, object]] = Field(default_factory=list)
     quote: str | None = None
 
 
@@ -118,6 +118,7 @@ class ArticleBlock(BaseModel):
     alt: str | None = None
     provider: str | None = None
     url: str | None = None
+    images: list[dict[str, str]] = Field(default_factory=list)
 
 
 class ArticleCreateRequest(BaseModel):
@@ -269,8 +270,8 @@ def resolve_category(name: str, subcategory: str | None = None) -> tuple[dict[st
 def normalize_article_blocks(
     payload: ArticleCreateRequest,
     title: str,
-) -> tuple[list[dict[str, str]], str | None, str | None, int]:
-    normalized_blocks: list[dict[str, str]] = []
+) -> tuple[list[dict[str, object]], str | None, str | None, int]:
+    normalized_blocks: list[dict[str, object]] = []
     first_image_url: str | None = None
     first_image_alt: str | None = None
     word_count = 0
@@ -284,6 +285,20 @@ def normalize_article_blocks(
             normalized_blocks.append({"type": "text", "content": html})
             word_count += len(text.split())
         if block.type == "image":
+            gallery = []
+            for image in block.images:
+                src = str(image.get("src", "")).strip()
+                if not src:
+                    continue
+                alt = str(image.get("alt", "")).strip() or title
+                original_src = str(image.get("original_src", "")).strip() or src
+                gallery.append({"src": src, "original_src": original_src, "alt": alt})
+                if first_image_url is None:
+                    first_image_url = src
+                    first_image_alt = alt
+            if gallery:
+                normalized_blocks.append({"type": "image", "images": gallery})
+                continue
             src = (block.src or "").strip()
             if not src:
                 continue

@@ -141,6 +141,7 @@ def init_database() -> None:
                 (SEED_VERSION,),
             )
         seed_subcategories_and_assign_articles(db)
+        seed_gallery_demo(db)
         seed_results_if_empty(db)
 
 
@@ -225,6 +226,54 @@ def seed_subcategories_and_assign_articles(db: sqlite3.Connection) -> None:
             )
 
 
+def seed_gallery_demo(db: sqlite3.Connection) -> None:
+    marker = db.execute(
+        "SELECT value FROM metadata WHERE key = 'gallery_demo_v2'"
+    ).fetchone()
+    if marker is not None:
+        return
+    article = db.execute(
+        "SELECT content_json FROM articles WHERE id = 6 AND image_url LIKE '%pexels-onbab%'"
+    ).fetchone()
+    if article is not None:
+        content = json.loads(article["content_json"])
+        gallery = next(
+            (
+                item
+                for item in content
+                if isinstance(item, dict)
+                and item.get("type") == "image"
+                and isinstance(item.get("images"), list)
+            ),
+            None,
+        )
+        if gallery is None:
+            gallery = {"type": "image", "images": []}
+            content.append(gallery)
+        demo_images = [
+            {"src": "/images/tennis/athletes-iga_swiatek-palm_springs_finals-2024-16.webp", "alt": "Tenisistka podczas meczu"},
+            {"src": "/images/tennis/2013_Australian_Open_-_Guillaume_Rufin.jpg", "alt": "Tenisista przygotowujący się do odbicia"},
+            {"src": "/images/tennis/pexels-onbab-32832526.jpg", "alt": "Piłka tenisowa przy linii kortu"},
+            {"src": "/images/football/pexels-mateo-franciosi-283676800-36958057.jpg", "alt": "Sportowcy podczas rywalizacji"},
+            {"src": "/images/football/cbbb0e04e13cfbfead22a3f4c45c4d54.jpg", "alt": "Akcja na arenie sportowej"},
+            {"src": "/images/F1/6a3fac923a1502_51383327.jpg", "alt": "Sport w pełnej prędkości"},
+            {"src": "/images/cycling/20220424_Liege_Bastogne_Liege117_edited_by_PetarM.jpg", "alt": "Zawodnicy na trasie"},
+        ]
+        existing_sources = {
+            image.get("src") for image in gallery["images"] if isinstance(image, dict)
+        }
+        gallery["images"].extend(
+            image for image in demo_images if image["src"] not in existing_sources
+        )
+        db.execute(
+            "UPDATE articles SET content_json = ? WHERE id = 6",
+            (json.dumps(content, ensure_ascii=False),),
+        )
+    db.execute(
+        "INSERT INTO metadata (key, value) VALUES ('gallery_demo_v2', '1')"
+    )
+
+
 def article_seed(
     article_id: int,
     category: str,
@@ -257,7 +306,7 @@ def article_seed(
 
 def article_from_row(row: sqlite3.Row) -> dict[str, Any]:
     raw_content = json.loads(row["content_json"])
-    blocks: list[dict[str, str]] = []
+    blocks: list[dict[str, Any]] = []
     content: list[str] = []
 
     for item in raw_content:
@@ -272,13 +321,30 @@ def article_from_row(row: sqlite3.Row) -> dict[str, Any]:
                     content.append(text)
                     blocks.append({"type": "text", "content": text})
             elif block_type == "image":
-                blocks.append(
-                    {
-                        "type": "image",
-                        "src": str(item.get("src", "")),
-                        "alt": str(item.get("alt", "")),
-                    }
-                )
+                images = item.get("images")
+                if isinstance(images, list):
+                    blocks.append(
+                        {
+                            "type": "image",
+                            "images": [
+                                {
+                                    "src": str(image.get("src", "")),
+                                    "original_src": str(image.get("original_src", image.get("src", ""))),
+                                    "alt": str(image.get("alt", "")),
+                                }
+                                for image in images
+                                if isinstance(image, dict) and image.get("src")
+                            ],
+                        }
+                    )
+                else:
+                    blocks.append(
+                        {
+                            "type": "image",
+                            "src": str(item.get("src", "")),
+                            "alt": str(item.get("alt", "")),
+                        }
+                    )
             elif block_type == "embed":
                 blocks.append(
                     {
@@ -854,7 +920,7 @@ def create_article(
     thumbnail_alt: str | None,
     featured_image_url: str | None,
     featured_image_alt: str | None,
-    blocks: list[dict[str, str]],
+    blocks: list[dict[str, Any]],
 ) -> dict[str, Any]:
     with connect() as db:
         next_id = db.execute(
@@ -910,7 +976,7 @@ def update_article(
     thumbnail_alt: str | None,
     featured_image_url: str | None,
     featured_image_alt: str | None,
-    blocks: list[dict[str, str]],
+    blocks: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
     with connect() as db:
         exists = db.execute(

@@ -28,8 +28,8 @@
       </header>
 
       @if (item.image_url) {
-        <figure>
-          <img [src]="item.image_url" [alt]="item.image_alt ?? item.title" />
+        <figure class="article-cover">
+          <img [src]="item.image_url" [alt]="item.image_alt ?? item.title" role="button" tabindex="0" (click)="openSingleImage(item.image_url, item.image_alt ?? item.title)" (keydown.enter)="openSingleImage(item.image_url, item.image_alt ?? item.title)" />
           <figcaption>Zdjęcie ilustracyjne · Pexels</figcaption>
         </figure>
       }
@@ -49,9 +49,21 @@
                 @if ($index === 1 && item.quote) {
                   <blockquote>{{ item.quote }}</blockquote>
                 }
+              } @else if (block.type === 'image' && block.images?.length) {
+                <figure class="article-gallery" [class.single]="visibleGallery(block.images ?? []).length === 1">
+                  @for (image of visibleGallery(block.images ?? []); track $index; let imageIndex = $index) {
+                    <div class="gallery-image" [class.lead-image]="$first && visibleGallery(block.images ?? []).length % 2 === 1" role="button" tabindex="0" (click)="openGallery(block.images ?? [], imageIndex)" (keydown.enter)="openGallery(block.images ?? [], imageIndex)">
+                      <img [src]="image.src" [alt]="image.alt || item.title" />
+                      @if ($last && hiddenGalleryCount(block.images ?? []) > 0) {
+                        <span class="gallery-more" [style.--overlay-opacity]="galleryOverlayOpacity(block.images ?? [])">+{{ hiddenGalleryCount(block.images ?? []) }}</span>
+                      }
+                      @if (image.alt) { <figcaption>{{ image.alt }}</figcaption> }
+                    </div>
+                  }
+                </figure>
               } @else if (block.src) {
                 <figure class="inline-image">
-                  <img [src]="block.src" [alt]="block.alt ?? item.title" />
+                  <img [src]="block.src" [alt]="block.alt ?? item.title" role="button" tabindex="0" (click)="openSingleImage(block.src, block.alt ?? item.title)" (keydown.enter)="openSingleImage(block.src, block.alt ?? item.title)" />
                   @if (block.alt) {
                     <figcaption>{{ block.alt }}</figcaption>
                   }
@@ -96,5 +108,26 @@
         </div>
       </div>
     </article>
+  }
+
+  @if (lightboxImages().length) {
+    <div class="lightbox" role="dialog" aria-modal="true" aria-label="Podgląd zdjęcia" (click)="closeLightbox()">
+      <button type="button" class="lightbox-close" aria-label="Zamknij podgląd" (click)="closeLightbox()">×</button>
+      @if (lightboxImages().length > 1) {
+        <button type="button" class="lightbox-nav previous" aria-label="Poprzednie zdjęcie" (click)="$event.stopPropagation(); previousImage()">‹</button>
+      }
+      <figure (click)="$event.stopPropagation()">
+        <img [src]="lightboxImages()[lightboxIndex()].src" [alt]="lightboxImages()[lightboxIndex()].alt" />
+        @if (lightboxImages()[lightboxIndex()].alt) {
+          <figcaption>{{ lightboxImages()[lightboxIndex()].alt }}</figcaption>
+        }
+        @if (lightboxImages().length > 1) {
+          <span class="lightbox-counter">{{ lightboxIndex() + 1 }} / {{ lightboxImages().length }}</span>
+        }
+      </figure>
+      @if (lightboxImages().length > 1) {
+        <button type="button" class="lightbox-nav next" aria-label="Następne zdjęcie" (click)="$event.stopPropagation(); nextImage()">›</button>
+      }
+    </div>
   }
 </main>

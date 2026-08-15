@@ -222,7 +222,7 @@
         </div>
 
         <div class="blocks-list">
-          @for (block of blocks(); track $index) {
+          @for (block of blocks(); track $index; let blockIndex = $index) {
             <article class="content-block">
               <div class="block-toolbar">
                 <strong>{{ blockLabel(block) }}</strong>
@@ -292,25 +292,57 @@
                 </div>
               } @else if (block.type === 'image') {
                 <div class="image-editor">
-                  @if (block.src) {
+                  @if (block.images?.length) {
+                    <div class="gallery-article-preview">
+                      @for (image of visibleGalleryImages(block); track $index) {
+                        <div class="gallery-preview-tile" [class.lead-image]="$first && visibleGalleryImages(block).length % 2 === 1">
+                          <img [src]="image.src" [alt]="image.alt || 'Podgląd zdjęcia galerii'" />
+                          @if ($last && hiddenGalleryCount(block) > 0) {
+                            <span class="gallery-more" [style.--overlay-opacity]="galleryOverlayOpacity(block)">+{{ hiddenGalleryCount(block) }}</span>
+                          }
+                        </div>
+                      }
+                    </div>
+                    <p class="gallery-preview-caption">Tak galeria będzie wyglądała w opublikowanym artykule.</p>
+                    <div class="gallery-editor-grid">
+                      @for (image of block.images; track $index; let imageIndex = $index) {
+                        <figure class="gallery-editor-item">
+                          <img [src]="image.src" [alt]="image.alt || 'Podgląd zdjęcia galerii'" />
+                          <input
+                            type="text"
+                            placeholder="Opis alternatywny zdjęcia"
+                            [name]="'galleryAlt' + blockIndex + '-' + imageIndex"
+                            [ngModel]="image.alt"
+                            (ngModelChange)="updateGalleryImageAlt(blockIndex, imageIndex, $event)"
+                          />
+                          <div>
+                            <button type="button" class="crop-button" (click)="recropGalleryImage(blockIndex, imageIndex)">Kadruj</button>
+                            <button type="button" class="remove-cover" (click)="removeGalleryImage(blockIndex, imageIndex)">Usuń</button>
+                          </div>
+                        </figure>
+                      }
+                    </div>
+                  } @else if (block.src) {
                     <img [src]="block.src" [alt]="block.alt || 'Podgląd zdjęcia'" />
                   } @else {
-                    <div class="image-placeholder">Dodaj zdjęcie</div>
+                    <div class="image-placeholder">Dodaj jedno zdjęcie lub całą galerię</div>
                   }
                   <label class="file-picker">
-                    <span>Wybierz plik</span>
-                    <input type="file" accept="image/*" (change)="selectImage($index, $event)" />
+                    <span>{{ block.images?.length ? '+ Dodaj zdjęcia do galerii' : 'Wybierz zdjęcie lub kilka zdjęć' }}</span>
+                    <input type="file" accept="image/*" multiple (change)="selectImage($index, $event)" />
                   </label>
                   @if (block.src) {
                     <button type="button" class="crop-button" (click)="recropBlockImage($index)">Kadruj ponownie</button>
                   }
-                  <input
-                    type="text"
-                    placeholder="Opis alternatywny zdjęcia"
-                    [name]="'blockAlt' + $index"
-                    [ngModel]="block.alt"
-                    (ngModelChange)="updateBlock($index, { alt: $event })"
-                  />
+                  @if (!block.images?.length) {
+                    <input
+                      type="text"
+                      placeholder="Opis alternatywny zdjęcia"
+                      [name]="'blockAlt' + $index"
+                      [ngModel]="block.alt"
+                      (ngModelChange)="updateBlock($index, { alt: $event })"
+                    />
+                  }
                 </div>
               } @else {
                 <div class="embed-editor">
@@ -373,6 +405,18 @@
             <p class="crop-format">{{ cropFormatLabel(crop) }}</p>
 
             <div class="crop-controls">
+              @if (crop.target === 'cover') {
+                <label>
+                  <span>Układ zdjęcia głównego</span>
+                  <select [ngModel]="crop.aspect" [ngModelOptions]="{ standalone: true }" (ngModelChange)="updateCrop({ aspect: +$event })">
+                    <option [value]="crop.imageWidth / crop.imageHeight">Oryginalny</option>
+                    <option [value]="16 / 9">Poziomy 16:9</option>
+                    <option [value]="4 / 3">Klasyczny 4:3</option>
+                    <option [value]="1">Kwadrat 1:1</option>
+                    <option [value]="3 / 4">Pionowy 3:4</option>
+                  </select>
+                </label>
+              }
               <label>
                 <span>Przybliżenie</span>
                 <input type="range" min="1" max="3" step="0.05" [ngModel]="crop.zoom" [ngModelOptions]="{ standalone: true }" (ngModelChange)="updateCrop({ zoom: +$event })" />

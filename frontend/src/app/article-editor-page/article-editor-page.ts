@@ -21,6 +21,13 @@ interface ArticleBlock {
   alt?: string;
   provider?: string;
   url?: string;
+  images?: GalleryImage[];
+}
+
+interface GalleryImage {
+  src: string;
+  alt: string;
+  original_src?: string;
 }
 
 interface CreatedArticle {
@@ -56,6 +63,8 @@ interface CropState {
   zoom: number;
   positionX: number;
   positionY: number;
+  galleryImageIndex?: number;
+  appendToGallery?: boolean;
 }
 
 @Component({
@@ -94,7 +103,10 @@ export class ArticleEditorPage {
   protected readonly errorMessage = signal('');
   protected readonly cropState = signal<CropState | null>(null);
   protected readonly effectiveCoverImage = computed(() =>
-    this.coverImage() || this.blocks().find((block) => block.type === 'image' && block.src)?.src || '',
+    this.coverImage()
+      || this.blocks().find((block) => block.type === 'image' && (block.src || block.images?.length))?.src
+      || this.blocks().find((block) => block.type === 'image' && block.images?.length)?.images?.[0]?.src
+      || '',
   );
   protected readonly usingFallbackCover = computed(() => !this.coverImage() && Boolean(this.effectiveCoverImage()));
   protected readonly effectiveThumbnailImage = computed(() => this.thumbnailImage() || this.effectiveCoverImage());
@@ -114,6 +126,7 @@ export class ArticleEditorPage {
     '#50e3a4',
   ];
   private savedSelection: Range | null = null;
+  private pendingGalleryCrops: { blockIndex: number; source: string; fileName: string }[] = [];
 
   constructor() {
     this.http
@@ -200,7 +213,7 @@ export class ArticleEditorPage {
 
   protected blockLabel(block: ArticleBlock): string {
     if (block.type === 'text') return 'Blok tekstowy';
-    if (block.type === 'image') return 'Blok zdjęcia';
+    if (block.type === 'image') return (block.images?.length ?? 0) > 1 ? `Galeria · zdjęć: ${block.images?.length}` : 'Blok zdjęcia';
     return 'Osadzony post';
   }
 
@@ -225,10 +238,26 @@ export class ArticleEditorPage {
   }
 
   protected selectImage(index: number, event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    this.openFileCropper(file, 'block', index);
-    (event.target as HTMLInputElement).value = '';
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    if (!files.length) return;
+    input.value = '';
+
+    const block = this.blocks()[index];
+    const useGallery = files.length > 1 || Boolean(block.images?.length) || Boolean(block.src);
+    if (!useGallery) {
+      this.openFileCropper(files[0], 'block', index);
+      return;
+    }
+
+    if (!block.images) {
+      const existing = block.src ? [{ src: block.src, original_src: block.src, alt: block.alt || 'Zdjęcie' }] : [];
+      this.updateBlock(index, { images: existing, src: undefined, alt: undefined });
+    }
+    Promise.all(files.map((file) => this.readImageFile(file))).then((images) => {
+      this.pendingGalleryCrops.push(...images.map((image) => ({ blockIndex: index, ...image })));
+      if (!this.cropState()) this.openNextGalleryCrop();
+    }).catch(() => this.errorMessage.set('Nie udało się odczytać jednego ze zdjęć.'));
   }
 
   protected selectCoverImage(event: Event): void {
@@ -273,6 +302,37 @@ export class ArticleEditorPage {
     if (block?.src) this.openCropper(block.src, 'block', index, block.alt || `zdjecie-${index + 1}`);
   }
 
+  protected recropGalleryImage(blockIndex: number, imageIndex: number): void {
+    const image = this.blocks()[blockIndex]?.images?.[imageIndex];
+    if (image) this.openCropper(image.original_src || image.src, 'block', blockIndex, image.alt, imageIndex);
+  }
+
+  protected removeGalleryImage(blockIndex: number, imageIndex: number): void {
+    const block = this.blocks()[blockIndex];
+    this.updateBlock(blockIndex, {
+      images: (block.images ?? []).filter((_, index) => index !== imageIndex),
+    });
+  }
+
+  protected updateGalleryImageAlt(blockIndex: number, imageIndex: number, alt: string): void {
+    const block = this.blocks()[blockIndex];
+    this.updateBlock(blockIndex, {
+      images: (block.images ?? []).map((image, index) => index === imageIndex ? { ...image, alt } : image),
+    });
+  }
+
+  protected visibleGalleryImages(block: ArticleBlock): GalleryImage[] {
+    return (block.images ?? []).slice(0, 4);
+  }
+
+  protected hiddenGalleryCount(block: ArticleBlock): number {
+    return Math.max(0, (block.images?.length ?? 0) - 4);
+  }
+
+  protected galleryOverlayOpacity(block: ArticleBlock): number {
+    return Math.min(0.82, 0.38 + this.hiddenGalleryCount(block) * 0.08);
+  }
+
   protected removeCoverImage(): void {
     this.coverImage.set('');
     this.coverImageAlt.set('');
@@ -288,18 +348,24 @@ export class ArticleEditorPage {
     this.featuredImageAlt.set('');
   }
 
-  protected updateCrop(patch: Partial<Pick<CropState, 'zoom' | 'positionX' | 'positionY'>>): void {
+  protected updateCrop(patch: Partial<Pick<CropState, 'aspect' | 'zoom' | 'positionX' | 'positionY'>>): void {
     this.cropState.update((state) => state ? { ...state, ...patch } : null);
     setTimeout(() => this.renderCropPreview());
   }
 
   protected cancelCrop(): void {
     this.cropState.set(null);
+    this.pendingGalleryCrops = [];
   }
 
   protected cropFormatLabel(crop: CropState): string {
     if (crop.target === 'thumbnail') return 'Miniatura · 1200 × 600 px · proporcje 2:1';
     if (crop.target === 'featured') return 'Materiał wyróżniony · 1200 × 1000 px · proporcje 6:5';
+    if (crop.target === 'block' && (crop.appendToGallery || crop.galleryImageIndex !== undefined)) {
+      return 'Zdjęcie galerii · stałe proporcje 4:3';
+    }
+    if (crop.target === 'block') return 'Zdjęcie w treści · stałe proporcje 16:9';
+    if (crop.target === 'cover') return `Zdjęcie główne · wybrany układ ${crop.aspect.toFixed(2)}:1 · maksymalnie 1180 × 720 px na stronie`;
     return `Zdjęcie zachowa proporcje oryginału · ${crop.imageWidth} × ${crop.imageHeight} px`;
   }
 
@@ -319,12 +385,26 @@ export class ArticleEditorPage {
       this.featuredImage.set(cropped);
       if (!this.featuredImageAlt()) this.featuredImageAlt.set(state.fileName);
     } else if (state.blockIndex !== undefined) {
-      this.updateBlock(state.blockIndex, {
-        src: cropped,
-        alt: this.blocks()[state.blockIndex]?.alt || state.fileName,
-      });
+      const block = this.blocks()[state.blockIndex];
+      if (state.galleryImageIndex !== undefined) {
+        this.updateBlock(state.blockIndex, {
+          images: (block.images ?? []).map((image, index) => index === state.galleryImageIndex
+            ? { src: cropped, original_src: image.original_src || state.source, alt: image.alt || state.fileName }
+            : image),
+        });
+      } else if (state.appendToGallery) {
+        this.updateBlock(state.blockIndex, {
+          images: [...(block.images ?? []), { src: cropped, original_src: state.source, alt: state.fileName }],
+        });
+      } else {
+        this.updateBlock(state.blockIndex, {
+          src: cropped,
+          alt: block.alt || state.fileName,
+        });
+      }
     }
     this.cropState.set(null);
+    if (state.appendToGallery) setTimeout(() => this.openNextGalleryCrop());
   }
 
   protected submit(): void {
@@ -368,12 +448,19 @@ export class ArticleEditorPage {
           type: 'image' as const,
           src: (block.src ?? '').trim(),
           alt: (block.alt ?? title).trim(),
+          images: (block.images ?? [])
+            .filter((image) => image.src.trim())
+            .map((image) => ({
+              src: image.src.trim(),
+              original_src: (image.original_src ?? image.src).trim(),
+              alt: image.alt.trim() || title,
+            })),
         };
       })
       .filter((block) => {
         if (block.type === 'text') return block.content;
         if (block.type === 'embed') return block.content || block.url;
-        return block.src;
+        return block.src || block.images.length;
       });
 
     if (!payloadBlocks.some((block) => block.type === 'text')) {
@@ -472,7 +559,29 @@ export class ArticleEditorPage {
     reader.readAsDataURL(file);
   }
 
-  private openCropper(source: string, target: CropState['target'], blockIndex?: number, fileName = 'zdjecie'): void {
+  private readImageFile(file: File): Promise<{ source: string; fileName: string }> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ source: String(reader.result), fileName: file.name });
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  private openNextGalleryCrop(): void {
+    const next = this.pendingGalleryCrops.shift();
+    if (!next) return;
+    this.openCropper(next.source, 'block', next.blockIndex, next.fileName, undefined, true);
+  }
+
+  private openCropper(
+    source: string,
+    target: CropState['target'],
+    blockIndex?: number,
+    fileName = 'zdjecie',
+    galleryImageIndex?: number,
+    appendToGallery = false,
+  ): void {
     const image = new Image();
     image.onload = () => {
       this.cropState.set({
@@ -487,10 +596,14 @@ export class ArticleEditorPage {
           ? 2
           : target === 'featured'
             ? 6 / 5
-            : image.naturalWidth / image.naturalHeight,
+            : target === 'block'
+              ? (appendToGallery || galleryImageIndex !== undefined ? 4 / 3 : 16 / 9)
+              : image.naturalWidth / image.naturalHeight,
         zoom: 1,
         positionX: 0,
         positionY: 0,
+        galleryImageIndex,
+        appendToGallery,
       });
       setTimeout(() => this.renderCropPreview());
     };

@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { Component, HostListener, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
@@ -32,6 +32,7 @@ interface ArticleBlock {
   alt?: string;
   provider?: string;
   url?: string;
+  images?: { src: string; original_src?: string; alt: string }[];
 }
 
 interface EmbedView {
@@ -57,6 +58,8 @@ export class ArticlePage {
   protected readonly article = signal<Article | null>(null);
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
+  protected readonly lightboxImages = signal<{ src: string; alt: string }[]>([]);
+  protected readonly lightboxIndex = signal(0);
 
   constructor() {
     this.route.paramMap
@@ -82,6 +85,54 @@ export class ArticlePage {
 
   protected exactDate(value: string): string {
     return exactPublishedAt(value);
+  }
+
+  protected visibleGallery(images: { src: string; original_src?: string; alt: string }[]): { src: string; original_src?: string; alt: string }[] {
+    return images.slice(0, 4);
+  }
+
+  protected hiddenGalleryCount(images: { src: string; original_src?: string; alt: string }[]): number {
+    return Math.max(0, images.length - 4);
+  }
+
+  protected galleryOverlayOpacity(images: { src: string; original_src?: string; alt: string }[]): number {
+    return Math.min(0.82, 0.38 + this.hiddenGalleryCount(images) * 0.08);
+  }
+
+  protected openSingleImage(src: string, alt: string): void {
+    this.lightboxImages.set([{ src, alt }]);
+    this.lightboxIndex.set(0);
+  }
+
+  protected openGallery(images: { src: string; original_src?: string; alt: string }[], index: number): void {
+    this.lightboxImages.set(images.map((image) => ({
+      src: image.original_src || image.src,
+      alt: image.alt,
+    })));
+    this.lightboxIndex.set(index);
+  }
+
+  protected closeLightbox(): void {
+    this.lightboxImages.set([]);
+    this.lightboxIndex.set(0);
+  }
+
+  protected previousImage(): void {
+    const count = this.lightboxImages().length;
+    if (count > 1) this.lightboxIndex.update((index) => (index - 1 + count) % count);
+  }
+
+  protected nextImage(): void {
+    const count = this.lightboxImages().length;
+    if (count > 1) this.lightboxIndex.update((index) => (index + 1) % count);
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  protected handleLightboxKeyboard(event: KeyboardEvent): void {
+    if (!this.lightboxImages().length) return;
+    if (event.key === 'Escape') this.closeLightbox();
+    if (event.key === 'ArrowLeft') this.previousImage();
+    if (event.key === 'ArrowRight') this.nextImage();
   }
 
   protected embedView(block: ArticleBlock): EmbedView {
