@@ -52,6 +52,11 @@ def init_database() -> None:
                 author_id INTEGER NOT NULL REFERENCES users(id),
                 image_url TEXT,
                 image_alt TEXT,
+                subcategory TEXT,
+                thumbnail_url TEXT,
+                thumbnail_alt TEXT,
+                featured_image_url TEXT,
+                featured_image_alt TEXT,
                 content_json TEXT NOT NULL,
                 quote TEXT
             );
@@ -59,6 +64,21 @@ def init_database() -> None:
             CREATE TABLE IF NOT EXISTS metadata (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                accent TEXT NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS subcategories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+                name TEXT NOT NULL COLLATE NOCASE,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(category_id, name)
             );
 
             CREATE TABLE IF NOT EXISTS results (
@@ -84,6 +104,7 @@ def init_database() -> None:
             """
         )
         ensure_article_columns(db)
+        ensure_categories(db)
         ensure_result_settings(db)
 
         user = db.execute(
@@ -119,6 +140,7 @@ def init_database() -> None:
                 """,
                 (SEED_VERSION,),
             )
+        seed_subcategories_and_assign_articles(db)
         seed_results_if_empty(db)
 
 
@@ -168,6 +190,39 @@ def seed_articles(db: sqlite3.Connection, author_id: int) -> None:
                 item["quote"],
             ),
         )
+
+
+def seed_subcategories_and_assign_articles(db: sqlite3.Connection) -> None:
+    examples = {
+        "Piłka nożna": [("Reprezentacja", 1), ("Liga", 2)],
+        "Tenis": [("WTA", 4), ("ATP", 5)],
+        "Formuła 1": [("Grand Prix", 7), ("Technika", 8)],
+        "Siatkówka": [("Reprezentacja", 10), ("Liga", 11)],
+        "Kolarstwo": [("Wyścigi etapowe", 13), ("Sprzęt", 14)],
+    }
+    for category_name, assignments in examples.items():
+        category = db.execute(
+            "SELECT id FROM categories WHERE name = ?", (category_name,)
+        ).fetchone()
+        if category is None:
+            continue
+        for order, (subcategory_name, article_id) in enumerate(assignments):
+            db.execute(
+                """
+                INSERT INTO subcategories (category_id, name, sort_order)
+                VALUES (?, ?, ?)
+                ON CONFLICT(category_id, name) DO NOTHING
+                """,
+                (category["id"], subcategory_name, order),
+            )
+            db.execute(
+                """
+                UPDATE articles
+                SET subcategory = ?
+                WHERE id = ? AND category = ? AND subcategory IS NULL
+                """,
+                (subcategory_name, article_id, category_name),
+            )
 
 
 def article_seed(
@@ -237,6 +292,7 @@ def article_from_row(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
         "category": row["category"],
+        "subcategory": row["subcategory"],
         "title": row["title"],
         "excerpt": row["excerpt"],
         "published_at": row["published_at"],
@@ -248,6 +304,10 @@ def article_from_row(row: sqlite3.Row) -> dict[str, Any]:
         "author": row["author"],
         "image_url": row["image_url"],
         "image_alt": row["image_alt"],
+        "thumbnail_url": row["thumbnail_url"],
+        "thumbnail_alt": row["thumbnail_alt"],
+        "featured_image_url": row["featured_image_url"],
+        "featured_image_alt": row["featured_image_alt"],
         "content": content,
         "blocks": blocks,
         "quote": row["quote"],
@@ -274,6 +334,11 @@ def ensure_article_columns(db: sqlite3.Connection) -> None:
         db.execute(
             "ALTER TABLE articles ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0"
         )
+    if "subcategory" not in columns:
+        db.execute("ALTER TABLE articles ADD COLUMN subcategory TEXT")
+    for column in ("thumbnail_url", "thumbnail_alt", "featured_image_url", "featured_image_alt"):
+        if column not in columns:
+            db.execute(f"ALTER TABLE articles ADD COLUMN {column} TEXT")
     db.execute(
         """
         UPDATE articles
@@ -286,6 +351,159 @@ def ensure_article_columns(db: sqlite3.Connection) -> None:
 SPORT_CATEGORIES = ["Piłka nożna", "Tenis", "Formuła 1", "Siatkówka", "Kolarstwo"]
 
 
+def ensure_categories(db: sqlite3.Connection) -> None:
+    count = db.execute("SELECT COUNT(*) AS count FROM categories").fetchone()["count"]
+    if count:
+        return
+    accents = ["#e8ff47", "#ff7a45", "#66d9ff", "#b48cff", "#50e3a4"]
+    for index, name in enumerate(SPORT_CATEGORIES):
+        db.execute(
+            "INSERT INTO categories (name, accent, sort_order) VALUES (?, ?, ?)",
+            (name, accents[index], index),
+        )
+
+
+def list_categories() -> list[dict[str, Any]]:
+    with connect() as db:
+        categories = db.execute(
+            "SELECT id, name, accent FROM categories ORDER BY sort_order, id"
+        ).fetchall()
+        subcategories = db.execute(
+            "SELECT id, category_id, name FROM subcategories ORDER BY sort_order, id"
+        ).fetchall()
+    children: dict[int, list[dict[str, Any]]] = {}
+    for row in subcategories:
+        children.setdefault(row["category_id"], []).append(
+            {"id": row["id"], "name": row["name"]}
+        )
+    return [
+        {
+            "id": row["id"],
+            "name": row["name"],
+            "accent": row["accent"],
+            "subcategories": children.get(row["id"], []),
+        }
+        for row in categories
+    ]
+
+
+def get_category_by_name(name: str) -> dict[str, Any] | None:
+    with connect() as db:
+        row = db.execute(
+            "SELECT id, name, accent FROM categories WHERE lower(name) = lower(?)",
+            (name,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def subcategory_belongs_to(category_id: int, name: str) -> bool:
+    with connect() as db:
+        row = db.execute(
+            "SELECT id FROM subcategories WHERE category_id = ? AND lower(name) = lower(?)",
+            (category_id, name),
+        ).fetchone()
+    return row is not None
+
+
+def rename_category(category_id: int, name: str, accent: str) -> dict[str, Any] | None:
+    with connect() as db:
+        current = db.execute(
+            "SELECT name FROM categories WHERE id = ?", (category_id,)
+        ).fetchone()
+        if current is None:
+            return None
+        old_name = current["name"]
+        db.execute(
+            "UPDATE categories SET name = ?, accent = ? WHERE id = ?",
+            (name, accent, category_id),
+        )
+        db.execute("UPDATE articles SET category = ? WHERE category = ?", (name, old_name))
+        db.execute("UPDATE articles SET accent = ? WHERE category = ?", (accent, name))
+        db.execute("UPDATE results SET category = ? WHERE category = ?", (name, old_name))
+        db.execute("UPDATE result_settings SET category = ? WHERE category = ?", (name, old_name))
+    return next((item for item in list_categories() if item["id"] == category_id), None)
+
+
+def delete_category(category_id: int) -> bool | None:
+    with connect() as db:
+        category = db.execute(
+            "SELECT name FROM categories WHERE id = ?", (category_id,)
+        ).fetchone()
+        if category is None:
+            return None
+        article_count = db.execute(
+            "SELECT COUNT(*) AS count FROM articles WHERE category = ?",
+            (category["name"],),
+        ).fetchone()["count"]
+        result_count = db.execute(
+            "SELECT COUNT(*) AS count FROM results WHERE category = ?",
+            (category["name"],),
+        ).fetchone()["count"]
+        if article_count or result_count:
+            return False
+        db.execute("DELETE FROM result_settings WHERE category = ?", (category["name"],))
+        db.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+    return True
+
+
+def create_subcategory(category_id: int, name: str) -> dict[str, Any] | None:
+    with connect() as db:
+        category = db.execute("SELECT id FROM categories WHERE id = ?", (category_id,)).fetchone()
+        if category is None:
+            return None
+        next_order = db.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM subcategories WHERE category_id = ?",
+            (category_id,),
+        ).fetchone()["value"]
+        cursor = db.execute(
+            "INSERT INTO subcategories (category_id, name, sort_order) VALUES (?, ?, ?)",
+            (category_id, name, next_order),
+        )
+        return {"id": cursor.lastrowid, "name": name}
+
+
+def rename_subcategory(subcategory_id: int, name: str) -> dict[str, Any] | None:
+    with connect() as db:
+        current = db.execute(
+            """
+            SELECT subcategories.name, categories.name AS category
+            FROM subcategories
+            JOIN categories ON categories.id = subcategories.category_id
+            WHERE subcategories.id = ?
+            """,
+            (subcategory_id,),
+        ).fetchone()
+        if current is None:
+            return None
+        db.execute("UPDATE subcategories SET name = ? WHERE id = ?", (name, subcategory_id))
+        db.execute(
+            "UPDATE articles SET subcategory = ? WHERE category = ? AND subcategory = ?",
+            (name, current["category"], current["name"]),
+        )
+    return {"id": subcategory_id, "name": name}
+
+
+def delete_subcategory(subcategory_id: int) -> bool:
+    with connect() as db:
+        current = db.execute(
+            """
+            SELECT subcategories.name, categories.name AS category
+            FROM subcategories
+            JOIN categories ON categories.id = subcategories.category_id
+            WHERE subcategories.id = ?
+            """,
+            (subcategory_id,),
+        ).fetchone()
+        if current is None:
+            return False
+        db.execute(
+            "UPDATE articles SET subcategory = NULL WHERE category = ? AND subcategory = ?",
+            (current["category"], current["name"]),
+        )
+        db.execute("DELETE FROM subcategories WHERE id = ?", (subcategory_id,))
+    return True
+
+
 def ensure_result_settings(db: sqlite3.Connection) -> None:
     db.execute(
         """
@@ -294,7 +512,9 @@ def ensure_result_settings(db: sqlite3.Connection) -> None:
         ON CONFLICT(category) DO NOTHING
         """
     )
-    for category in SPORT_CATEGORIES:
+    categories = db.execute("SELECT name FROM categories ORDER BY sort_order, id").fetchall()
+    for row in categories:
+        category = row["name"]
         db.execute(
             """
             INSERT INTO result_settings (category, visible_limit)
@@ -582,10 +802,21 @@ def delete_result(result_id: int) -> bool:
     return cursor.rowcount > 0
 
 
-def list_articles(category: str | None = None, *, include_hidden: bool = False) -> list[dict[str, Any]]:
+def list_articles(
+    category: str | None = None,
+    subcategory: str | None = None,
+    *,
+    include_hidden: bool = False,
+) -> list[dict[str, Any]]:
     with connect() as db:
         visibility_filter = "" if include_hidden else " hidden = 0 AND "
-        if category:
+        if category and subcategory:
+            rows = db.execute(
+                ARTICLE_SELECT
+                + f" WHERE {visibility_filter} lower(category) = lower(?) AND lower(subcategory) = lower(?) ORDER BY published_at DESC",
+                (category, subcategory),
+            ).fetchall()
+        elif category:
             rows = db.execute(
                 ARTICLE_SELECT
                 + f" WHERE {visibility_filter} lower(category) = lower(?) ORDER BY published_at DESC",
@@ -610,6 +841,7 @@ def get_article(article_id: int) -> dict[str, Any] | None:
 def create_article(
     *,
     category: str,
+    subcategory: str | None,
     title: str,
     excerpt: str,
     published_at: str,
@@ -618,6 +850,10 @@ def create_article(
     author_id: int,
     image_url: str | None,
     image_alt: str | None,
+    thumbnail_url: str | None,
+    thumbnail_alt: str | None,
+    featured_image_url: str | None,
+    featured_image_alt: str | None,
     blocks: list[dict[str, str]],
 ) -> dict[str, Any]:
     with connect() as db:
@@ -627,14 +863,16 @@ def create_article(
         db.execute(
             """
             INSERT INTO articles (
-                id, category, title, excerpt, published_at, reading_time,
+                id, category, subcategory, title, excerpt, published_at, reading_time,
                 featured, category_featured, hidden, accent, author_id, image_url, image_alt,
+                thumbnail_url, thumbnail_alt, featured_image_url, featured_image_alt,
                 content_json, quote
-            ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, NULL)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
             """,
             (
                 next_id,
                 category,
+                subcategory,
                 title,
                 excerpt,
                 published_at,
@@ -643,6 +881,10 @@ def create_article(
                 author_id,
                 image_url,
                 image_alt,
+                thumbnail_url,
+                thumbnail_alt,
+                featured_image_url,
+                featured_image_alt,
                 json.dumps(blocks, ensure_ascii=False),
             ),
         )
@@ -656,6 +898,7 @@ def update_article(
     article_id: int,
     *,
     category: str,
+    subcategory: str | None,
     title: str,
     excerpt: str,
     published_at: str,
@@ -663,6 +906,10 @@ def update_article(
     accent: str,
     image_url: str | None,
     image_alt: str | None,
+    thumbnail_url: str | None,
+    thumbnail_alt: str | None,
+    featured_image_url: str | None,
+    featured_image_alt: str | None,
     blocks: list[dict[str, str]],
 ) -> dict[str, Any] | None:
     with connect() as db:
@@ -676,6 +923,7 @@ def update_article(
             """
             UPDATE articles
             SET category = ?,
+                subcategory = ?,
                 title = ?,
                 excerpt = ?,
                 published_at = ?,
@@ -683,12 +931,17 @@ def update_article(
                 accent = ?,
                 image_url = ?,
                 image_alt = ?,
+                thumbnail_url = ?,
+                thumbnail_alt = ?,
+                featured_image_url = ?,
+                featured_image_alt = ?,
                 content_json = ?,
                 quote = NULL
             WHERE id = ?
             """,
             (
                 category,
+                subcategory,
                 title,
                 excerpt,
                 published_at,
@@ -696,6 +949,10 @@ def update_article(
                 accent,
                 image_url,
                 image_alt,
+                thumbnail_url,
+                thumbnail_alt,
+                featured_image_url,
+                featured_image_alt,
                 json.dumps(blocks, ensure_ascii=False),
                 article_id,
             ),

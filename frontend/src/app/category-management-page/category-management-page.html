@@ -1,0 +1,68 @@
+<main class="category-page">
+  @if (auth.checkingSession()) {
+    <section class="state-card"><span class="loader"></span><p>Sprawdzamy sesję…</p></section>
+  } @else if (!auth.username()) {
+    <section class="state-card">
+      <span class="eyebrow">Panel redakcyjny</span>
+      <h1>Najpierw logowanie</h1>
+      <p>Zarządzanie kategoriami jest dostępne tylko dla zalogowanego pracownika.</p>
+      <a routerLink="/employee">Przejdź do logowania →</a>
+    </section>
+  } @else {
+    <header class="page-head">
+      <a class="back-link" routerLink="/">← Wróć do portalu</a>
+      <span class="eyebrow">Struktura portalu</span>
+      <h1>Zarządzaj kategoriami</h1>
+      <p>Zmieniaj nazwy głównych kategorii i twórz podkategorie widoczne w rozwijanym menu.</p>
+    </header>
+
+    @if (errorMessage()) { <p class="message error" role="alert">{{ errorMessage() }}</p> }
+    @if (successMessage()) { <p class="message success">{{ successMessage() }}</p> }
+
+    @if (loading()) {
+      <section class="state-card"><span class="loader"></span><p>Ładujemy kategorie…</p></section>
+    } @else {
+      <div class="category-list">
+        @for (category of categories(); track category.id) {
+          <section class="category-card" [style.--accent]="category.accent">
+            <div class="category-title">
+              <span class="accent-dot"></span>
+              <div><small>Kategoria główna</small><strong>{{ category.name }}</strong></div>
+            </div>
+
+            <div class="edit-row">
+              <label>
+                <span>Nowa nazwa kategorii</span>
+                <input [(ngModel)]="category.draftName" [name]="'category-' + category.id" />
+              </label>
+              <label class="color-field">
+                <span>Kolor przewodni</span>
+                <div><input type="color" [(ngModel)]="category.accent" [name]="'color-' + category.id" /><code>{{ category.accent }}</code></div>
+              </label>
+              <button type="button" [disabled]="busyKey() === 'category-' + category.id" (click)="saveCategory(category)">Zapisz zmiany</button>
+              <button class="danger" type="button" [disabled]="busyKey() === 'delete-category-' + category.id" (click)="deleteCategory(category)">Usuń kategorię</button>
+            </div>
+
+            <div class="subcategories">
+              <div class="section-title"><span>Podkategorie</span><b>{{ category.subcategories.length }}</b></div>
+              @for (subcategory of category.subcategories; track subcategory.id) {
+                <div class="subcategory-row">
+                  <input [(ngModel)]="subcategory.draftName" [name]="'subcategory-' + subcategory.id" />
+                  <button type="button" [disabled]="busyKey() === 'subcategory-' + subcategory.id" (click)="saveSubcategory(category, subcategory)">Zapisz</button>
+                  <button class="danger" type="button" [disabled]="busyKey() === 'delete-subcategory-' + subcategory.id" (click)="deleteSubcategory(category, subcategory)">Usuń</button>
+                </div>
+              } @empty {
+                <p class="empty">Ta kategoria nie ma jeszcze podkategorii.</p>
+              }
+
+              <div class="new-subcategory">
+                <input [(ngModel)]="category.newSubcategory" [name]="'new-' + category.id" placeholder="Nazwa nowej podkategorii" (keydown.enter)="$event.preventDefault(); addSubcategory(category)" />
+                <button type="button" [disabled]="busyKey() === 'new-' + category.id" (click)="addSubcategory(category)">+ Dodaj podkategorię</button>
+              </div>
+            </div>
+          </section>
+        }
+      </div>
+    }
+  }
+</main>

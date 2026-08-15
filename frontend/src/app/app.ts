@@ -22,18 +22,20 @@ export class App {
   protected readonly searchOpen = signal(false);
   protected readonly searchPhrase = signal('');
   protected readonly selectedCategory = signal('Wszystkie');
+  protected readonly selectedSubcategory = signal('');
   protected readonly loading = signal(true);
   protected readonly error = signal(false);
   protected readonly articles = signal<Article[]>([]);
   protected readonly matches = signal<Match[]>([]);
   protected readonly standings = signal<Standing[]>([]);
-  protected readonly categories = ['Wszystkie', 'Piłka nożna', 'Tenis', 'Formuła 1', 'Siatkówka', 'Kolarstwo'];
+  protected readonly categories = signal<Category[]>([]);
 
   protected readonly filteredArticles = computed(() => {
     const category = this.selectedCategory();
     const phrase = this.searchPhrase().trim().toLocaleLowerCase('pl');
     return this.articles().filter((item) =>
       (category === 'Wszystkie' || item.category === category) &&
+      (!this.selectedSubcategory() || item.subcategory === this.selectedSubcategory()) &&
       (!phrase || `${item.title} ${item.excerpt} ${item.category}`.toLocaleLowerCase('pl').includes(phrase))
     );
   });
@@ -72,6 +74,11 @@ export class App {
     this.http.get<HomeData>('/api/home').subscribe({
       next: (data) => {
         this.articles.set(data.articles);
+        this.categories.set(data.categories);
+        if (this.selectedCategory() !== 'Wszystkie' && !data.categories.some((item) => item.name === this.selectedCategory())) {
+          this.selectedCategory.set('Wszystkie');
+          this.selectedSubcategory.set('');
+        }
         if (this.selectedCategory() === 'Wszystkie') {
           this.matches.set(data.matches);
         } else {
@@ -89,6 +96,18 @@ export class App {
 
   protected selectCategory(category: string): void {
     this.selectedCategory.set(category);
+    this.selectedSubcategory.set('');
+    this.menuOpen.set(false);
+    if (this.routedPage()) {
+      this.router.navigate(['/']);
+    } else {
+      this.loadMatchesForCategory(category);
+    }
+  }
+
+  protected selectSubcategory(category: string, subcategory: string): void {
+    this.selectedCategory.set(category);
+    this.selectedSubcategory.set(subcategory);
     this.menuOpen.set(false);
     if (this.routedPage()) {
       this.router.navigate(['/']);
@@ -139,6 +158,8 @@ export class App {
 
 interface Team { name: string; short_name: string; score: number | null; }
 interface Match { id: number; discipline: string; category?: string; status: string; time: string; is_live: boolean; visible: boolean; home: Team; away: Team; }
-interface Article { id: number; category: string; title: string; excerpt: string; published_at: string; reading_time: number; featured: boolean; category_featured: boolean; hidden: boolean; accent: string; author: string; image_url?: string; image_alt?: string; }
+interface Article { id: number; category: string; subcategory?: string | null; title: string; excerpt: string; published_at: string; reading_time: number; featured: boolean; category_featured: boolean; hidden: boolean; accent: string; author: string; image_url?: string; image_alt?: string; thumbnail_url?: string; thumbnail_alt?: string; featured_image_url?: string; featured_image_alt?: string; }
+interface Subcategory { id: number; name: string; }
+interface Category { id: number; name: string; accent: string; subcategories: Subcategory[]; }
 interface Standing { position: number; team: string; played: number; points: number; }
-interface HomeData { articles: Article[]; matches: Match[]; standings: Standing[]; }
+interface HomeData { articles: Article[]; matches: Match[]; standings: Standing[]; categories: Category[]; }

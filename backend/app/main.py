@@ -1,5 +1,6 @@
 import os
 import re
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from secrets import token_urlsafe
@@ -11,22 +12,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .database import (
+    create_subcategory,
     create_article,
     create_result,
     delete_article,
+    delete_category,
     delete_result,
+    delete_subcategory,
     get_article,
+    get_category_by_name,
     get_result,
     get_result_settings,
     get_user,
     init_database,
     list_articles,
+    list_categories,
     list_results,
+    rename_category,
+    rename_subcategory,
     set_article_hidden,
     set_featured_article,
     set_result_limit,
     set_result_visibility,
     toggle_result_status,
+    subcategory_belongs_to,
     update_article,
     update_result,
     verify_password,
@@ -55,6 +64,7 @@ class Match(BaseModel):
 class Article(BaseModel):
     id: int
     category: str
+    subcategory: str | None = None
     title: str
     excerpt: str
     published_at: str
@@ -66,6 +76,10 @@ class Article(BaseModel):
     author: str
     image_url: str | None = None
     image_alt: str | None = None
+    thumbnail_url: str | None = None
+    thumbnail_alt: str | None = None
+    featured_image_url: str | None = None
+    featured_image_alt: str | None = None
     content: list[str] = Field(default_factory=list)
     blocks: list[dict[str, str]] = Field(default_factory=list)
     quote: str | None = None
@@ -74,6 +88,27 @@ class Article(BaseModel):
 class Sport(BaseModel):
     name: str
     accent: str
+
+
+class Subcategory(BaseModel):
+    id: int
+    name: str
+
+
+class Category(BaseModel):
+    id: int
+    name: str
+    accent: str
+    subcategories: list[Subcategory] = Field(default_factory=list)
+
+
+class NameRequest(BaseModel):
+    name: str = ""
+
+
+class CategoryUpdateRequest(BaseModel):
+    name: str = ""
+    accent: str = ""
 
 
 class ArticleBlock(BaseModel):
@@ -87,9 +122,16 @@ class ArticleBlock(BaseModel):
 
 class ArticleCreateRequest(BaseModel):
     category: str
+    subcategory: str | None = None
     title: str = ""
     excerpt: str = ""
     published_at: str | None = None
+    image_url: str | None = None
+    image_alt: str | None = None
+    thumbnail_url: str | None = None
+    thumbnail_alt: str | None = None
+    featured_image_url: str | None = None
+    featured_image_alt: str | None = None
     blocks: list[ArticleBlock] = Field(default_factory=list)
 
 
@@ -139,6 +181,7 @@ class HomeResponse(BaseModel):
     articles: list[Article]
     matches: list[Match]
     standings: list[Standing]
+    categories: list[Category]
 
 
 class LoginRequest(BaseModel):
@@ -213,6 +256,16 @@ def extract_first_url(value: str) -> str:
     return match.group(0) if match else value.strip()
 
 
+def resolve_category(name: str, subcategory: str | None = None) -> tuple[dict[str, object], str | None]:
+    category = get_category_by_name(name)
+    if category is None:
+        raise HTTPException(status_code=400, detail="Nieznana kategoria sportu")
+    normalized_subcategory = (subcategory or "").strip() or None
+    if normalized_subcategory and not subcategory_belongs_to(int(category["id"]), normalized_subcategory):
+        raise HTTPException(status_code=400, detail="Podkategoria nie należy do wybranej kategorii")
+    return category, normalized_subcategory
+
+
 def normalize_article_blocks(
     payload: ArticleCreateRequest,
     title: str,
@@ -280,12 +333,13 @@ def home() -> HomeResponse:
         articles=[Article(**item) for item in list_articles()],
         matches=[Match(**item) for item in list_results()],
         standings=STANDINGS,
+        categories=[Category(**item) for item in list_categories()],
     )
 
 
 @app.get("/api/articles", response_model=list[Article])
-def articles(category: str | None = None) -> list[Article]:
-    return [Article(**item) for item in list_articles(category)]
+def articles(category: str | None = None, subcategory: str | None = None) -> list[Article]:
+    return [Article(**item) for item in list_articles(category, subcategory)]
 
 
 @app.get("/api/employee/articles", response_model=list[Article])
@@ -296,7 +350,98 @@ def employee_articles(authorization: str | None = Header(default=None)) -> list[
 
 @app.get("/api/sports", response_model=list[Sport])
 def sports() -> list[Sport]:
-    return SPORTS
+    return [Sport(name=item["name"], accent=item["accent"]) for item in list_categories()]
+
+
+@app.get("/api/categories", response_model=list[Category])
+def categories() -> list[Category]:
+    return [Category(**item) for item in list_categories()]
+
+
+@app.put("/api/categories/{category_id}", response_model=Category)
+def update_category_name(
+    category_id: int,
+    payload: CategoryUpdateRequest,
+    authorization: str | None = Header(default=None),
+) -> Category:
+    session_user(authorization)
+    name = payload.name.strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=400, detail="Nazwa kategorii musi mieć przynajmniej 2 znaki")
+    accent = payload.accent.strip().lower()
+    if not re.fullmatch(r"#[0-9a-f]{6}", accent):
+        raise HTTPException(status_code=400, detail="Kolor musi mieć format HEX, np. #e8ff47")
+    try:
+        updated = rename_category(category_id, name, accent)
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Kategoria o tej nazwie już istnieje") from exc
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Nie znaleziono kategorii")
+    return Category(**updated)
+
+
+@app.delete("/api/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_category(
+    category_id: int,
+    authorization: str | None = Header(default=None),
+) -> None:
+    session_user(authorization)
+    removed = delete_category(category_id)
+    if removed is None:
+        raise HTTPException(status_code=404, detail="Nie znaleziono kategorii")
+    if not removed:
+        raise HTTPException(
+            status_code=409,
+            detail="Nie można usunąć kategorii zawierającej artykuły lub wyniki. Najpierw usuń albo przenieś jej zawartość.",
+        )
+
+
+@app.post("/api/categories/{category_id}/subcategories", response_model=Subcategory, status_code=status.HTTP_201_CREATED)
+def add_subcategory(
+    category_id: int,
+    payload: NameRequest,
+    authorization: str | None = Header(default=None),
+) -> Subcategory:
+    session_user(authorization)
+    name = payload.name.strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=400, detail="Nazwa podkategorii musi mieć przynajmniej 2 znaki")
+    try:
+        created = create_subcategory(category_id, name)
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Taka podkategoria już istnieje") from exc
+    if created is None:
+        raise HTTPException(status_code=404, detail="Nie znaleziono kategorii")
+    return Subcategory(**created)
+
+
+@app.put("/api/subcategories/{subcategory_id}", response_model=Subcategory)
+def update_subcategory_name(
+    subcategory_id: int,
+    payload: NameRequest,
+    authorization: str | None = Header(default=None),
+) -> Subcategory:
+    session_user(authorization)
+    name = payload.name.strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=400, detail="Nazwa podkategorii musi mieć przynajmniej 2 znaki")
+    try:
+        updated = rename_subcategory(subcategory_id, name)
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Taka podkategoria już istnieje") from exc
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Nie znaleziono podkategorii")
+    return Subcategory(**updated)
+
+
+@app.delete("/api/subcategories/{subcategory_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_subcategory(
+    subcategory_id: int,
+    authorization: str | None = Header(default=None),
+) -> None:
+    session_user(authorization)
+    if not delete_subcategory(subcategory_id):
+        raise HTTPException(status_code=404, detail="Nie znaleziono podkategorii")
 
 
 @app.get("/api/articles/{article_id}", response_model=Article)
@@ -320,11 +465,11 @@ def add_article(
     if len(excerpt) < 10:
         raise HTTPException(status_code=400, detail="Skrót artykułu musi mieć przynajmniej 10 znaków")
 
-    sport = next((item for item in SPORTS if item.name == payload.category), None)
-    if sport is None:
-        raise HTTPException(status_code=400, detail="Nieznana kategoria sportu")
+    sport, subcategory = resolve_category(payload.category, payload.subcategory)
 
     normalized_blocks, first_image_url, first_image_alt, word_count = normalize_article_blocks(payload, title)
+    cover_image_url = (payload.image_url or "").strip() or first_image_url
+    cover_image_alt = (payload.image_alt or "").strip() or first_image_alt or title
 
     if not normalized_blocks or not any(item["type"] == "text" for item in normalized_blocks):
         raise HTTPException(
@@ -345,15 +490,20 @@ def add_article(
         published_at = parsed.astimezone(timezone.utc).isoformat()
 
     article = create_article(
-        category=sport.name,
+        category=str(sport["name"]),
+        subcategory=subcategory,
         title=title,
         excerpt=excerpt,
         published_at=published_at,
         reading_time=max(1, round(word_count / 180)),
-        accent=sport.accent,
+        accent=str(sport["accent"]),
         author_id=int(user["id"]),
-        image_url=first_image_url,
-        image_alt=first_image_alt,
+        image_url=cover_image_url,
+        image_alt=cover_image_alt if cover_image_url else None,
+        thumbnail_url=(payload.thumbnail_url or "").strip() or None,
+        thumbnail_alt=(payload.thumbnail_alt or "").strip() or None,
+        featured_image_url=(payload.featured_image_url or "").strip() or None,
+        featured_image_alt=(payload.featured_image_alt or "").strip() or None,
         blocks=normalized_blocks,
     )
     return Article(**article)
@@ -373,11 +523,11 @@ def edit_article(
     if len(excerpt) < 10:
         raise HTTPException(status_code=400, detail="Skrót artykułu musi mieć przynajmniej 10 znaków")
 
-    sport = next((item for item in SPORTS if item.name == payload.category), None)
-    if sport is None:
-        raise HTTPException(status_code=400, detail="Nieznana kategoria sportu")
+    sport, subcategory = resolve_category(payload.category, payload.subcategory)
 
     normalized_blocks, first_image_url, first_image_alt, word_count = normalize_article_blocks(payload, title)
+    cover_image_url = (payload.image_url or "").strip() or first_image_url
+    cover_image_alt = (payload.image_alt or "").strip() or first_image_alt or title
 
     if not normalized_blocks or not any(item["type"] == "text" for item in normalized_blocks):
         raise HTTPException(
@@ -399,14 +549,19 @@ def edit_article(
 
     article = update_article(
         article_id,
-        category=sport.name,
+        category=str(sport["name"]),
+        subcategory=subcategory,
         title=title,
         excerpt=excerpt,
         published_at=published_at,
         reading_time=max(1, round(word_count / 180)),
-        accent=sport.accent,
-        image_url=first_image_url,
-        image_alt=first_image_alt,
+        accent=str(sport["accent"]),
+        image_url=cover_image_url,
+        image_alt=cover_image_alt if cover_image_url else None,
+        thumbnail_url=(payload.thumbnail_url or "").strip() or None,
+        thumbnail_alt=(payload.thumbnail_alt or "").strip() or None,
+        featured_image_url=(payload.featured_image_url or "").strip() or None,
+        featured_image_alt=(payload.featured_image_alt or "").strip() or None,
         blocks=normalized_blocks,
     )
     if article is None:
@@ -470,14 +625,12 @@ def add_result(
     authorization: str | None = Header(default=None),
 ) -> Match:
     session_user(authorization)
-    sport = next((item for item in SPORTS if item.name == payload.category), None)
-    if sport is None:
-        raise HTTPException(status_code=400, detail="Nieznana kategoria sportu")
+    sport, _ = resolve_category(payload.category)
     if not payload.home_name.strip() or not payload.away_name.strip():
         raise HTTPException(status_code=400, detail="Podaj obie strony wyniku")
 
     result = create_result(
-        category=sport.name,
+        category=str(sport["name"]),
         home_name=payload.home_name.strip(),
         home_short_name=(payload.home_short_name or payload.home_name[:3]).strip().upper()[:4],
         home_score=payload.home_score,
@@ -508,15 +661,13 @@ def edit_result(
     authorization: str | None = Header(default=None),
 ) -> Match:
     session_user(authorization)
-    sport = next((item for item in SPORTS if item.name == payload.category), None)
-    if sport is None:
-        raise HTTPException(status_code=400, detail="Nieznana kategoria sportu")
+    sport, _ = resolve_category(payload.category)
     if not payload.home_name.strip() or not payload.away_name.strip():
         raise HTTPException(status_code=400, detail="Podaj obie strony wyniku")
 
     item = update_result(
         result_id,
-        category=sport.name,
+        category=str(sport["name"]),
         home_name=payload.home_name.strip(),
         home_short_name=(payload.home_short_name or payload.home_name[:3]).strip().upper()[:4],
         home_score=payload.home_score,

@@ -25,10 +25,25 @@
               name="sport"
               [disabled]="loadingSports()"
               [ngModel]="selectedSport()"
-              (ngModelChange)="selectedSport.set($event)"
+              (ngModelChange)="selectSport($event)"
             >
               @for (sport of sports(); track sport.name) {
                 <option [value]="sport.name">{{ sport.name }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            <span>Podkategoria (opcjonalnie)</span>
+            <select
+              name="subcategory"
+              [disabled]="!selectedSportSubcategories().length"
+              [ngModel]="selectedSubcategory()"
+              (ngModelChange)="selectedSubcategory.set($event)"
+            >
+              <option value="">Bez podkategorii</option>
+              @for (subcategory of selectedSportSubcategories(); track subcategory.id) {
+                <option [value]="subcategory.name">{{ subcategory.name }}</option>
               }
             </select>
           </label>
@@ -77,6 +92,120 @@
             (ngModelChange)="excerpt.set($event)"
           ></textarea>
         </label>
+      </section>
+
+      <section class="panel cover-panel">
+        <div class="cover-heading">
+          <div>
+            <span class="access-label">Nagłówek artykułu</span>
+            <h2>Zdjęcie główne</h2>
+          </div>
+          @if (coverImage()) {
+            <button type="button" class="remove-cover" (click)="removeCoverImage()">Usuń zdjęcie główne</button>
+          }
+        </div>
+        <p class="cover-description">To zdjęcie pojawi się na początku otwartego artykułu. Jeśli go nie wybierzesz, portal użyje pierwszego zdjęcia z treści.</p>
+        @if (effectiveCoverImage(); as coverPreview) {
+          @if (usingFallbackCover()) {
+            <p class="fallback-notice">Używane jest pierwsze zdjęcie z treści. Po wykadrowaniu zostanie zapisane jako osobne zdjęcie główne.</p>
+          }
+          <img class="cover-preview" [src]="coverPreview" [alt]="coverImageAlt() || 'Zdjęcie główne artykułu'" />
+        } @else {
+          <div class="cover-placeholder">Brak zdjęcia głównego — użyjemy pierwszego zdjęcia z artykułu</div>
+        }
+        <div class="image-buttons">
+          <label class="file-picker">
+            <span>{{ coverImage() ? 'Wybierz inne zdjęcie' : 'Wybierz zdjęcie główne' }}</span>
+            <input type="file" accept="image/*" (change)="selectCoverImage($event)" />
+          </label>
+          @if (effectiveCoverImage()) {
+            <button type="button" class="crop-button" (click)="recropCoverImage()">Kadruj ponownie</button>
+          }
+        </div>
+        <input
+          type="text"
+          name="coverImageAlt"
+          placeholder="Opis alternatywny zdjęcia głównego"
+          [ngModel]="coverImageAlt()"
+          (ngModelChange)="coverImageAlt.set($event)"
+        />
+      </section>
+
+      <section class="panel placement-panel">
+        <div class="cover-heading">
+          <div>
+            <span class="access-label">Strona główna i strony sportów</span>
+            <h2>Osobne kadry publikacji</h2>
+          </div>
+        </div>
+        <p class="cover-description">Miniatura i materiał wyróżniony mogą używać własnych zdjęć oraz niezależnych kadrów. Bez osobnego wyboru automatycznie użyją zdjęcia głównego artykułu.</p>
+
+        <div class="placement-grid">
+          <section class="portal-preview">
+            <span class="preview-label">Miniaturka artykułu</span>
+            @if (effectiveThumbnailImage(); as thumbnailPreview) {
+              @if (usingFallbackThumbnail()) {
+                <p class="placement-fallback">Używa zdjęcia głównego</p>
+              }
+              <div class="thumbnail-preview">
+                <div class="thumbnail-image">
+                  <img [src]="thumbnailPreview" alt="" />
+                  <span>{{ selectedSport() || 'Sport' }}</span>
+                </div>
+                <div class="thumbnail-copy">
+                  <small>{{ selectedSport() || 'Sport' }}</small>
+                  <strong>{{ title() || 'Tytuł artykułu' }}</strong>
+                  <p>{{ excerpt() || 'Tutaj pojawi się krótki opis artykułu.' }}</p>
+                </div>
+              </div>
+            } @else {
+              <div class="placement-placeholder">Najpierw wybierz zdjęcie główne albo osobną miniaturę</div>
+            }
+            <div class="placement-actions">
+              <label class="file-picker">
+                <span>{{ thumbnailImage() ? 'Podmień miniaturę' : 'Wybierz osobną miniaturę' }}</span>
+                <input type="file" accept="image/*" (change)="selectThumbnailImage($event)" />
+              </label>
+              @if (effectiveThumbnailImage()) {
+                <button type="button" class="crop-button" (click)="recropThumbnailImage()">Kadruj miniaturę</button>
+              }
+              @if (thumbnailImage()) {
+                <button type="button" class="remove-cover" (click)="removeThumbnailImage()">Użyj zdjęcia głównego</button>
+              }
+            </div>
+          </section>
+
+          <section class="portal-preview featured-portal-preview">
+            <span class="preview-label">Wyróżniony artykuł na stronie głównej</span>
+            @if (effectiveFeaturedImage(); as featuredPreviewImage) {
+              @if (usingFallbackFeatured()) {
+                <p class="placement-fallback">Używa zdjęcia głównego</p>
+              }
+              <div class="featured-preview">
+                <div class="featured-preview-copy">
+                  <small>{{ selectedSport() || 'Sport' }} · Najważniejsze</small>
+                  <strong>{{ title() || 'Tytuł wyróżnionego artykułu' }}</strong>
+                  <p>{{ excerpt() || 'Tutaj pojawi się krótki opis artykułu.' }}</p>
+                </div>
+                <div class="featured-preview-image"><img [src]="featuredPreviewImage" alt="" /></div>
+              </div>
+            } @else {
+              <div class="placement-placeholder">Najpierw wybierz zdjęcie główne albo osobne zdjęcie wyróżnione</div>
+            }
+            <div class="placement-actions">
+              <label class="file-picker">
+                <span>{{ featuredImage() ? 'Podmień zdjęcie' : 'Wybierz osobne zdjęcie' }}</span>
+                <input type="file" accept="image/*" (change)="selectFeaturedImage($event)" />
+              </label>
+              @if (effectiveFeaturedImage()) {
+                <button type="button" class="crop-button" (click)="recropFeaturedImage()">Kadruj zdjęcie</button>
+              }
+              @if (featuredImage()) {
+                <button type="button" class="remove-cover" (click)="removeFeaturedImage()">Użyj zdjęcia głównego</button>
+              }
+            </div>
+          </section>
+        </div>
       </section>
 
       <section class="blocks-panel">
@@ -172,6 +301,9 @@
                     <span>Wybierz plik</span>
                     <input type="file" accept="image/*" (change)="selectImage($index, $event)" />
                   </label>
+                  @if (block.src) {
+                    <button type="button" class="crop-button" (click)="recropBlockImage($index)">Kadruj ponownie</button>
+                  }
                   <input
                     type="text"
                     placeholder="Opis alternatywny zdjęcia"
@@ -225,6 +357,43 @@
           <span>→</span>
         </button>
       </footer>
+
+      @if (cropState(); as crop) {
+        <div class="crop-backdrop" (click)="cancelCrop()">
+          <section class="crop-dialog" role="dialog" aria-modal="true" aria-labelledby="crop-title" (click)="$event.stopPropagation()">
+            <div class="crop-heading">
+              <div>
+                <span class="access-label">Edycja zdjęcia</span>
+                <h2 id="crop-title">Ustaw kadr</h2>
+              </div>
+              <button type="button" class="crop-close" aria-label="Zamknij" (click)="cancelCrop()">×</button>
+            </div>
+
+            <canvas #cropCanvas class="crop-canvas"></canvas>
+            <p class="crop-format">{{ cropFormatLabel(crop) }}</p>
+
+            <div class="crop-controls">
+              <label>
+                <span>Przybliżenie</span>
+                <input type="range" min="1" max="3" step="0.05" [ngModel]="crop.zoom" [ngModelOptions]="{ standalone: true }" (ngModelChange)="updateCrop({ zoom: +$event })" />
+              </label>
+              <label>
+                <span>Pozycja pozioma</span>
+                <input type="range" min="-100" max="100" step="1" [ngModel]="crop.positionX" [ngModelOptions]="{ standalone: true }" (ngModelChange)="updateCrop({ positionX: +$event })" />
+              </label>
+              <label>
+                <span>Pozycja pionowa</span>
+                <input type="range" min="-100" max="100" step="1" [ngModel]="crop.positionY" [ngModelOptions]="{ standalone: true }" (ngModelChange)="updateCrop({ positionY: +$event })" />
+              </label>
+            </div>
+
+            <div class="crop-actions">
+              <button type="button" (click)="cancelCrop()">Anuluj</button>
+              <button type="button" class="apply-crop" (click)="applyCrop()">Zastosuj kadr</button>
+            </div>
+          </section>
+        </div>
+      }
     </form>
   }
 </main>

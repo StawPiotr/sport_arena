@@ -54,7 +54,7 @@ h1 {
 .byline span { color: var(--muted); margin-top: 3px; }
 figure { margin: 0 0 62px; }
 figure img {
-  aspect-ratio: 16 / 8; border-radius: 14px; display: block; object-fit: cover; object-position: center 58%;
+  border-radius: 14px; display: block; height: auto; object-fit: contain;
   width: 100%;
 }
 figcaption { color: var(--muted); font-size: 9px; letter-spacing: .5px; margin-top: 10px; text-transform: uppercase; }
@@ -149,7 +149,7 @@ blockquote {
   h1 { font-size: 44px; letter-spacing: -2.6px; }
   .byline { justify-content: flex-start; }
   figure { margin: 0 -17px 45px; }
-  figure img { aspect-ratio: 4 / 3; border-radius: 0; }
+  figure img { border-radius: 0; }
   figcaption { padding: 0 17px; }
   .article-layout { display: block; }
   .share { flex-direction: row; margin-bottom: 28px; }

@@ -11,6 +11,7 @@ import { XEmbed } from '../x-embed/x-embed';
 interface Article {
   id: number;
   category: string;
+  subcategory: string | null;
   title: string;
   excerpt: string;
   published_at: string;

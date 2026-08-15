@@ -18,7 +18,7 @@
       </div>
 
       <header class="article-header">
-        <span class="category">{{ item.category }}</span>
+        <span class="category">{{ item.category }}{{ item.subcategory ? ' · ' + item.subcategory : '' }}</span>
         <h1>{{ item.title }}</h1>
         <p class="lead">{{ item.excerpt }}</p>
         <div class="byline">

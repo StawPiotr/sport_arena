@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -8,8 +8,10 @@ import { finalize } from 'rxjs';
 import { AuthService } from '../auth.service';
 
 interface Sport {
+  id: number;
   name: string;
   accent: string;
+  subcategories: { id: number; name: string }[];
 }
 
 interface ArticleBlock {
@@ -28,11 +30,32 @@ interface CreatedArticle {
 interface EditableArticle {
   id: number;
   category: string;
+  subcategory: string | null;
   title: string;
   excerpt: string;
   published_at: string;
   content: string[];
   blocks: ArticleBlock[];
+  image_url: string | null;
+  image_alt: string | null;
+  thumbnail_url: string | null;
+  thumbnail_alt: string | null;
+  featured_image_url: string | null;
+  featured_image_alt: string | null;
+}
+
+interface CropState {
+  target: 'cover' | 'thumbnail' | 'featured' | 'block';
+  blockIndex?: number;
+  source: string;
+  fileName: string;
+  imageWidth: number;
+  imageHeight: number;
+  image: HTMLImageElement;
+  aspect: number;
+  zoom: number;
+  positionX: number;
+  positionY: number;
 }
 
 @Component({
@@ -42,6 +65,7 @@ interface EditableArticle {
   styleUrl: './article-editor-page.scss',
 })
 export class ArticleEditorPage {
+  @ViewChild('cropCanvas') private cropCanvas?: ElementRef<HTMLCanvasElement>;
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -50,8 +74,15 @@ export class ArticleEditorPage {
 
   protected readonly sports = signal<Sport[]>([]);
   protected readonly selectedSport = signal('');
+  protected readonly selectedSubcategory = signal('');
   protected readonly title = signal('');
   protected readonly excerpt = signal('');
+  protected readonly coverImage = signal('');
+  protected readonly coverImageAlt = signal('');
+  protected readonly thumbnailImage = signal('');
+  protected readonly thumbnailImageAlt = signal('');
+  protected readonly featuredImage = signal('');
+  protected readonly featuredImageAlt = signal('');
   protected readonly publishLater = signal(false);
   protected readonly publishedAt = signal('');
   protected readonly blocks = signal<ArticleBlock[]>([
@@ -61,6 +92,15 @@ export class ArticleEditorPage {
   protected readonly loadingArticle = signal(false);
   protected readonly submitting = signal(false);
   protected readonly errorMessage = signal('');
+  protected readonly cropState = signal<CropState | null>(null);
+  protected readonly effectiveCoverImage = computed(() =>
+    this.coverImage() || this.blocks().find((block) => block.type === 'image' && block.src)?.src || '',
+  );
+  protected readonly usingFallbackCover = computed(() => !this.coverImage() && Boolean(this.effectiveCoverImage()));
+  protected readonly effectiveThumbnailImage = computed(() => this.thumbnailImage() || this.effectiveCoverImage());
+  protected readonly effectiveFeaturedImage = computed(() => this.featuredImage() || this.effectiveCoverImage());
+  protected readonly usingFallbackThumbnail = computed(() => !this.thumbnailImage() && Boolean(this.effectiveThumbnailImage()));
+  protected readonly usingFallbackFeatured = computed(() => !this.featuredImage() && Boolean(this.effectiveFeaturedImage()));
   protected readonly editing = signal(Boolean(this.articleId));
   protected readonly textColor = signal('#dfff3f');
   protected readonly suggestedColors = [
@@ -77,7 +117,7 @@ export class ArticleEditorPage {
 
   constructor() {
     this.http
-      .get<Sport[]>('/api/sports')
+      .get<Sport[]>('/api/categories')
       .pipe(finalize(() => this.loadingSports.set(false)))
       .subscribe({
         next: (sports) => {
@@ -103,6 +143,18 @@ export class ArticleEditorPage {
 
   protected addTextBlock(): void {
     this.blocks.update((blocks) => [...blocks, { type: 'text', content: '' }]);
+  }
+
+  protected selectSport(name: string): void {
+    this.selectedSport.set(name);
+    const category = this.sports().find((item) => item.name === name);
+    if (!category?.subcategories.some((item) => item.name === this.selectedSubcategory())) {
+      this.selectedSubcategory.set('');
+    }
+  }
+
+  protected selectedSportSubcategories(): { id: number; name: string }[] {
+    return this.sports().find((item) => item.name === this.selectedSport())?.subcategories ?? [];
   }
 
   protected addImageBlock(): void {
@@ -175,15 +227,104 @@ export class ArticleEditorPage {
   protected selectImage(index: number, event: Event): void {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    this.openFileCropper(file, 'block', index);
+    (event.target as HTMLInputElement).value = '';
+  }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      this.updateBlock(index, {
-        src: String(reader.result),
-        alt: this.blocks()[index]?.alt || file.name,
+  protected selectCoverImage(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    this.openFileCropper(file, 'cover');
+    (event.target as HTMLInputElement).value = '';
+  }
+
+  protected selectThumbnailImage(event: Event): void {
+    this.selectPlacementImage(event, 'thumbnail');
+  }
+
+  protected selectFeaturedImage(event: Event): void {
+    this.selectPlacementImage(event, 'featured');
+  }
+
+  protected recropCoverImage(): void {
+    const source = this.effectiveCoverImage();
+    if (!source) return;
+    const fallbackImage = this.blocks().find((block) => block.type === 'image' && block.src);
+    this.openCropper(
+      source,
+      'cover',
+      undefined,
+      this.coverImageAlt() || fallbackImage?.alt || 'zdjecie-glowne',
+    );
+  }
+
+  protected recropThumbnailImage(): void {
+    const source = this.effectiveThumbnailImage();
+    if (source) this.openCropper(source, 'thumbnail', undefined, this.thumbnailImageAlt() || 'miniatura');
+  }
+
+  protected recropFeaturedImage(): void {
+    const source = this.effectiveFeaturedImage();
+    if (source) this.openCropper(source, 'featured', undefined, this.featuredImageAlt() || 'zdjecie-wyroznione');
+  }
+
+  protected recropBlockImage(index: number): void {
+    const block = this.blocks()[index];
+    if (block?.src) this.openCropper(block.src, 'block', index, block.alt || `zdjecie-${index + 1}`);
+  }
+
+  protected removeCoverImage(): void {
+    this.coverImage.set('');
+    this.coverImageAlt.set('');
+  }
+
+  protected removeThumbnailImage(): void {
+    this.thumbnailImage.set('');
+    this.thumbnailImageAlt.set('');
+  }
+
+  protected removeFeaturedImage(): void {
+    this.featuredImage.set('');
+    this.featuredImageAlt.set('');
+  }
+
+  protected updateCrop(patch: Partial<Pick<CropState, 'zoom' | 'positionX' | 'positionY'>>): void {
+    this.cropState.update((state) => state ? { ...state, ...patch } : null);
+    setTimeout(() => this.renderCropPreview());
+  }
+
+  protected cancelCrop(): void {
+    this.cropState.set(null);
+  }
+
+  protected cropFormatLabel(crop: CropState): string {
+    if (crop.target === 'thumbnail') return 'Miniatura · 1200 × 600 px · proporcje 2:1';
+    if (crop.target === 'featured') return 'Materiał wyróżniony · 1200 × 1000 px · proporcje 6:5';
+    return `Zdjęcie zachowa proporcje oryginału · ${crop.imageWidth} × ${crop.imageHeight} px`;
+  }
+
+  protected applyCrop(): void {
+    const state = this.cropState();
+    if (!state) return;
+    const cropped = this.drawCrop(state, true);
+    if (!cropped) return;
+
+    if (state.target === 'cover') {
+      this.coverImage.set(cropped);
+      if (!this.coverImageAlt()) this.coverImageAlt.set(state.fileName);
+    } else if (state.target === 'thumbnail') {
+      this.thumbnailImage.set(cropped);
+      if (!this.thumbnailImageAlt()) this.thumbnailImageAlt.set(state.fileName);
+    } else if (state.target === 'featured') {
+      this.featuredImage.set(cropped);
+      if (!this.featuredImageAlt()) this.featuredImageAlt.set(state.fileName);
+    } else if (state.blockIndex !== undefined) {
+      this.updateBlock(state.blockIndex, {
+        src: cropped,
+        alt: this.blocks()[state.blockIndex]?.alt || state.fileName,
       });
-    };
-    reader.readAsDataURL(file);
+    }
+    this.cropState.set(null);
   }
 
   protected submit(): void {
@@ -243,11 +384,18 @@ export class ArticleEditorPage {
     this.submitting.set(true);
     const payload = {
       category: this.selectedSport(),
+      subcategory: this.selectedSubcategory().trim() || null,
       title,
       excerpt,
       published_at: this.publishLater() && this.publishedAt()
         ? new Date(this.publishedAt()).toISOString()
         : null,
+      image_url: this.coverImage().trim() || null,
+      image_alt: this.coverImage() ? (this.coverImageAlt().trim() || title) : null,
+      thumbnail_url: this.thumbnailImage().trim() || null,
+      thumbnail_alt: this.thumbnailImage() ? (this.thumbnailImageAlt().trim() || title) : null,
+      featured_image_url: this.featuredImage().trim() || null,
+      featured_image_alt: this.featuredImage() ? (this.featuredImageAlt().trim() || title) : null,
       blocks: payloadBlocks,
     };
     const request = this.articleId
@@ -270,8 +418,15 @@ export class ArticleEditorPage {
 
   private fillForm(article: EditableArticle): void {
     this.selectedSport.set(article.category);
+    this.selectedSubcategory.set(article.subcategory ?? '');
     this.title.set(article.title);
     this.excerpt.set(article.excerpt);
+    this.coverImage.set(article.image_url ?? '');
+    this.coverImageAlt.set(article.image_alt ?? '');
+    this.thumbnailImage.set(article.thumbnail_url ?? '');
+    this.thumbnailImageAlt.set(article.thumbnail_alt ?? '');
+    this.featuredImage.set(article.featured_image_url ?? '');
+    this.featuredImageAlt.set(article.featured_image_alt ?? '');
     this.publishLater.set(true);
     this.publishedAt.set(this.toLocalInputDate(article.published_at));
 
@@ -301,6 +456,88 @@ export class ArticleEditorPage {
     if (!selection) return;
     selection.removeAllRanges();
     selection.addRange(this.savedSelection);
+  }
+
+  private selectPlacementImage(event: Event, target: 'thumbnail' | 'featured'): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.openFileCropper(file, target);
+    input.value = '';
+  }
+
+  private openFileCropper(file: File, target: CropState['target'], blockIndex?: number): void {
+    const reader = new FileReader();
+    reader.onload = () => this.openCropper(String(reader.result), target, blockIndex, file.name);
+    reader.readAsDataURL(file);
+  }
+
+  private openCropper(source: string, target: CropState['target'], blockIndex?: number, fileName = 'zdjecie'): void {
+    const image = new Image();
+    image.onload = () => {
+      this.cropState.set({
+        target,
+        blockIndex,
+        source,
+        fileName,
+        imageWidth: image.naturalWidth,
+        imageHeight: image.naturalHeight,
+        image,
+        aspect: target === 'thumbnail'
+          ? 2
+          : target === 'featured'
+            ? 6 / 5
+            : image.naturalWidth / image.naturalHeight,
+        zoom: 1,
+        positionX: 0,
+        positionY: 0,
+      });
+      setTimeout(() => this.renderCropPreview());
+    };
+    image.onerror = () => this.errorMessage.set('Nie udało się odczytać wybranego zdjęcia.');
+    image.src = source;
+  }
+
+  private renderCropPreview(): void {
+    const state = this.cropState();
+    const canvas = this.cropCanvas?.nativeElement;
+    if (!state || !canvas) return;
+    const width = Math.min(720, window.innerWidth - 80);
+    canvas.width = Math.max(280, width);
+    canvas.height = Math.round(canvas.width / state.aspect);
+    this.drawCrop(state, false, canvas);
+  }
+
+  private drawCrop(state: CropState, exportImage: boolean, targetCanvas?: HTMLCanvasElement): string | null {
+    const canvas = targetCanvas ?? document.createElement('canvas');
+    if (exportImage) {
+      if (state.target === 'thumbnail') {
+        canvas.width = 1200;
+        canvas.height = 600;
+      } else if (state.target === 'featured') {
+        canvas.width = 1200;
+        canvas.height = 1000;
+      } else {
+        canvas.width = Math.min(1600, state.imageWidth);
+        canvas.height = Math.round(canvas.width / state.aspect);
+      }
+    }
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+
+    const sourceAspect = state.imageWidth / state.imageHeight;
+    let cropWidth = sourceAspect > state.aspect ? state.imageHeight * state.aspect : state.imageWidth;
+    let cropHeight = sourceAspect > state.aspect ? state.imageHeight : state.imageWidth / state.aspect;
+    cropWidth /= state.zoom;
+    cropHeight /= state.zoom;
+    const travelX = (state.imageWidth - cropWidth) / 2;
+    const travelY = (state.imageHeight - cropHeight) / 2;
+    const sourceX = state.imageWidth / 2 + (state.positionX / 100) * travelX - cropWidth / 2;
+    const sourceY = state.imageHeight / 2 + (state.positionY / 100) * travelY - cropHeight / 2;
+
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(state.image, sourceX, sourceY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+    return exportImage ? canvas.toDataURL('image/jpeg', 0.9) : '';
   }
 
   private apiErrorMessage(error: unknown): string {

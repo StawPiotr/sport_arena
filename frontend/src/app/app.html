@@ -4,10 +4,24 @@
       <span class="brand-mark">A</span><span>ARENA</span>
     </a>
     <nav [class.open]="menuOpen()" aria-label="Główna nawigacja">
-      @for (category of categories; track category) {
-        <button type="button" [class.active]="selectedCategory() === category" (click)="selectCategory(category)">
-          {{ category }}
-        </button>
+      <button type="button" [class.active]="selectedCategory() === 'Wszystkie'" (click)="selectCategory('Wszystkie')">Wszystkie</button>
+      @for (category of categories(); track category.id) {
+        <div class="category-nav-item">
+          <button type="button" [class.active]="selectedCategory() === category.name" (click)="selectCategory(category.name)">
+            {{ category.name }}
+          </button>
+          @if (category.subcategories.length) {
+            <div class="subcategory-menu">
+              @for (subcategory of category.subcategories; track subcategory.id) {
+                <button
+                  type="button"
+                  [class.active]="selectedCategory() === category.name && selectedSubcategory() === subcategory.name"
+                  (click)="selectSubcategory(category.name, subcategory.name)"
+                >{{ subcategory.name }}</button>
+              }
+            </div>
+          }
+        </div>
       }
     </nav>
     <div class="header-actions">
@@ -22,6 +36,7 @@
               <a routerLink="/employee/article/new">Dodaj nowy artykuł</a>
               <a routerLink="/employee/results">Zarządzaj wynikami</a>
               <a routerLink="/employee/result/new">Dodaj nowy wynik</a>
+              <a routerLink="/employee/categories">Zarządzaj kategoriami</a>
               <button type="button" (click)="logout()">Wyloguj się</button>
             </div>
           }
@@ -70,15 +85,19 @@
         <section class="hero">
           <article class="hero-story" [style.--accent]="featured.accent">
             <div class="hero-copy">
-              <span class="eyebrow">{{ featured.category }} · Najważniejsze</span>
+              <span class="eyebrow">{{ featured.category }}{{ featured.subcategory ? ' · ' + featured.subcategory : '' }} · Najważniejsze</span>
               <h1>{{ featured.title }}</h1>
               <p>{{ featured.excerpt }}</p>
               <div class="story-meta"><span>{{ featured.author }} · {{ publishedLabel(featured.published_at) }}</span><span>{{ featured.reading_time }} min czytania</span></div>
               <button type="button" class="primary-button" [routerLink]="['/artykul', featured.id]">Czytaj artykuł <span>↗</span></button>
             </div>
             <div class="hero-visual" aria-hidden="true">
-              <div class="stadium-lines"></div>
-              <div class="score-orbit"><span>POL</span><strong>2:1</strong><span>NED</span></div>
+              @if (featured.featured_image_url || featured.image_url; as featuredVisual) {
+                <img class="hero-image" [src]="featuredVisual" alt="" />
+              } @else {
+                <div class="stadium-lines"></div>
+                <div class="score-orbit"><span>POL</span><strong>2:1</strong><span>NED</span></div>
+              }
               <span class="visual-caption">W centrum wydarzeń</span>
             </div>
           </article>
@@ -95,13 +114,13 @@
             @for (article of filteredArticles(); track article.id) {
               <a class="article-card" [style.--accent]="article.accent" [routerLink]="['/artykul', article.id]">
                 <div class="article-art">
-                  @if (article.image_url) {
-                    <img [src]="article.image_url" [alt]="article.image_alt ?? ''" />
+                  @if (article.thumbnail_url || article.image_url; as thumbnail) {
+                    <img [src]="thumbnail" [alt]="article.thumbnail_alt || article.image_alt || ''" />
                   }
-                  <span>{{ article.category }}</span><div class="art-number">{{ article.id.toString().padStart(2, '0') }}</div>
+                  <span>{{ article.subcategory || article.category }}</span><div class="art-number">{{ article.id.toString().padStart(2, '0') }}</div>
                 </div>
                 <div class="article-body">
-                  <span class="category">{{ article.category }}</span>
+                  <span class="category">{{ article.category }}{{ article.subcategory ? ' · ' + article.subcategory : '' }}</span>
                   <h3>{{ article.title }}</h3>
                   <p>{{ article.excerpt }}</p>
                   <div class="story-meta"><span>{{ article.author }} · {{ publishedLabel(article.published_at) }}</span><span>{{ article.reading_time }} min</span></div>
